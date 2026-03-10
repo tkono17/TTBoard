@@ -1,14 +1,19 @@
 import logging
 import typer
+import tkinter as tk
 from ..app import App
 from ..view import ViewControl
+from ..gui import MainWindow
 
 log = logging.getLogger(__name__)
 app = typer.Typer()
 
 def startGui():
     log.info(f'Start TTBoard application in GUI mode')
-    pass
+    root = tk.Tk()
+    root.geometry('1200x800')
+    window = MainWindow(root)
+    root.mainloop()
 
 def runBatch():
     log.info(f'Start TTBoard application in batch mode')

@@ -1,6 +1,9 @@
 from typing import Any
 from dataclasses import dataclass
 import jsonpath
+import logging
+
+log = logging.getLogger(__name__)
 
 @dataclass
 class JsonSelector:
@@ -16,6 +19,7 @@ class JsonSelector:
         if self.nArgs == len(args):
             args1 = list(map(lambda x: str(x), args))
             expr = self.expr(self.jsonPath, *args1)
+            log.info(f'    JSONPath expr: {expr} {args1}')
         else:
             return None
         x = jsonpath.findall(expr, document)

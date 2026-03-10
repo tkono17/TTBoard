@@ -13,6 +13,7 @@ dependencies = [
 ttboard-cli = "ttboard.cli.main:main"
 ttboard-test-jsonpath = "ttboard.tests.testJsonPath:main"
 ttboard-test-selector = "ttboard.tests.testSelector:main"
+ttboard-test-appflow1 = "ttboard.tests.testAppFlow1:main"
 
 [build-system]
 requires = [ "hatchling" ]
