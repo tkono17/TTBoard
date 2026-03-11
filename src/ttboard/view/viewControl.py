@@ -57,7 +57,7 @@ class ViewControl:
     def addTableRow(self, table, values):
         table.insert('', 'end', values=values)
 
-    def updateTableEntries(self, table, entries, columns):
+    def updateTableEntries(self, table, entries, columns, allColumns=None):
         nentries = len(entries)
         ncolumns = len(columns)
         log.info(f'List table {nentries} entries with {ncolumns} columns')
@@ -84,9 +84,14 @@ class ViewControl:
 
         if table:
             table.delete(*table.get_children())
+            ocolumns = columns # ordered columns
+            if allColumns is not None:
+                ocolumns = list(filter(lambda c: c in columns, allColumns))
 
-            table.config(columns=columns, show='headings')
-            for column in columns:
+            log.info(f'ocolumns: {ocolumns}')
+            log.info(f'entries: {entries}')
+            table.config(columns=ocolumns, show='headings')
+            for column in ocolumns:
                 log.info(f'  configure columns')
                 table.column(column, width=100, anchor=tk.W)
                 table.heading(column, text=column, anchor='center')
@@ -103,18 +108,24 @@ class ViewControl:
         tree = self.findWidget('listTable')
         columnsEn = [ x[0] for x in filter(lambda y: y[1], self.listColumns)]
         if self.listStyle == 'table':
-            self.updateTableEntries(tree, self.listEntries, columnsEn)
+            allColumns = list(map(lambda x: x[0], self.listColumns))
+            self.updateTableEntries(tree, self.listEntries, columnsEn, allColumns)
         elif self.listStyle == 'board':
             self.updateBoardEntries(tree, self.listEntries, columnsEn)
 
     def updateObject(self, jpath, obj):
         self.objectJsonPath.set(jpath)
-        columns = ('Field', 'Value')
-        entries = [ {
-            'Field': key,
-            'Value': value
-            } for (key, value) in obj.items() ]
         tree = self.findWidget('objectTable')
+
+        allFields = [ x[0] for x in self.listColumns ]
+        fields = [ key for key in allFields if key in obj.keys() ]
+        log.info(f' object fields: {fields}')
+        columns = ('Included', 'Field', 'Value')
+        entries = [ {
+            'Included': 'x',
+            'Field': key,
+            'Value': obj[key]
+            } for key in fields ]
         self.updateTableEntries(tree, entries, columns)
         
     #--------------------------------------------------------------------
@@ -180,6 +191,7 @@ class ViewControl:
                 arg = f'?@.{c1} == "{values[0]}" && @.{c2} == "{values[1]}"'
                 args = re.findall('\[(.*?)\]', self.listJsonPath.get())
                 args[-1] = arg
+                log.info(f' selector args: {args}')
                 v = self.app.getList(self.selectedCollection, args)
                 if len(v) == 1:
                     selector = self.app.findSelector(self.selectedCollection)
