@@ -81,6 +81,12 @@ class App:
             self.listElementType = None
         return self.currentList
             
+    def findSelector(self, sname):
+        selector = None
+        v = list(filter(lambda x: x.name == sname, self.selectors))
+        if len(v) == 1:
+            selector = v[0]
+        return selector
     
     def addList(self, name, data):
         v = map(lambda x: x.name == name, self.selectors)

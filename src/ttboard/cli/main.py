@@ -10,9 +10,16 @@ app = typer.Typer()
 
 def startGui():
     log.info(f'Start TTBoard application in GUI mode')
+
+    app = App()
+    
     root = tk.Tk()
     root.geometry('1200x800')
     window = MainWindow(root)
+    
+    viewControl = ViewControl(window, app)
+    window.build(viewControl)
+    
     root.mainloop()
 
 def runBatch():
