@@ -67,7 +67,7 @@ class App:
             log.warning(f'    Output directory = {dn}, document null? {dnull}')
         pass
 
-    def getList(self, selectorName, *args):
+    def getList(self, selectorName, args):
         selectors1 = filter(lambda x: x.name == selectorName, self.selectors)
         selectors1 = list(selectors1)
         selector = selectors1[0] if len(selectors1)>0 else None

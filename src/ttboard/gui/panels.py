@@ -36,7 +36,7 @@ class PathRow(tk.Frame):
         vc.addWidget('objJpathText', jpathText)
 
         jpathLabel.pack(side=tk.LEFT)
-        jpathText.pack(side=tk.LEFT)
+        jpathText.pack(side=tk.LEFT, fill=tk.X)
         
 class EntryArray(tk.Frame):
     def __init__(self, master, n=0, **kwargs):
@@ -81,6 +81,7 @@ class ListPanel(tk.Frame):
         buttons = ListButtons(self)
         table = ttk.Treeview(self, columns=(1, 2, 3), show='headings')
 
+        table.bind('<Double-1>', vc.onEntrySelected)
         vc.addWidget('listTable', table)
         
         collection.build(vc)
@@ -97,15 +98,15 @@ class ObjectPanel(tk.Frame):
     def build(self, vc):
         label = tk.Label(self, text='Object view')
         jsonPath = PathRow(self)
-        table = ttk.Treeview(self, columns=('Field name', 'Value'),
+        table = ttk.Treeview(self, columns=('Field', 'Value'),
                              show='headings')
 
-        vc.addWidget('ObjectTable', table)
-        
+        vc.addWidget('objectTable', table)
         jsonPath.build(vc)
         
         label.pack(anchor=tk.NW)
-        jsonPath.pack(anchor=tk.NW)
+        jsonPath.pack(anchor=tk.NW, fill=tk.X)
+        table.pack(anchor=tk.NW, fill=tk.BOTH, expand=True)
         
 
 class MainPanel(tk.Frame):

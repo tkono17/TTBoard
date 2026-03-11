@@ -23,7 +23,8 @@ class ViewControl:
         self.selectedCollection = None
         self.listJsonPath = tk.StringVar(value='$.')
         self.listEntries = []
-        self.listColumnStatus = []
+        self.listColumns = []
+        self.listStyle = 'table'
         
         # Data related to an object
         self.objectJsonPath = tk.StringVar(value='$.')
@@ -55,39 +56,67 @@ class ViewControl:
 
     def addTableRow(self, table, values):
         table.insert('', 'end', values=values)
-        
-    def updateListTable(self):
+
+    def updateTableEntries(self, table, entries, columns):
+        nentries = len(entries)
+        ncolumns = len(columns)
+        log.info(f'List table {nentries} entries with {ncolumns} columns')
+
         def valuesIn(entry):
             values, etype = [], type(entry)
+            log.info(f'  entry type: {etype}')
             if etype == dict:
+                log.info(f'  entry type is dict')
                 keys = entry.keys()
+                log.info(f'  keys: {keys}, columns={columns}')
                 for cname in columns:
                     if cname in keys:
+                        log.info(f'  cname={cname} in keys')
                         values.append(entry[cname])
                     else:
+                        log.info(f'  cname={cname} not in keys')
                         values.append('')
             elif etype in (int, float, str):
                 values = [ entry ]
             else:
                 log.warning('Do not know how to get value from {etype}')
             return values
-        
-        nentries = len(self.listEntries)
-        ncolumns = len(self.listColumns)
-        log.info(f'List table {nentries} entries with {ncolumns} columns')
 
-        columns = [ x[0] for x in filter(lambda y: y[1], self.listColumns)]
-        tree = self.findWidget('listTable')
-        if tree:
-            tree.delete(*tree.get_children())
+        if table:
+            table.delete(*table.get_children())
 
-            tree.config(columns=columns, show='headings')
+            table.config(columns=columns, show='headings')
             for column in columns:
-                tree.column(column, width=100, anchor='center')
-                tree.heading(column, text=column, anchor='center')
-            for entry in self.listEntries:
+                log.info(f'  configure columns')
+                table.column(column, width=100, anchor=tk.W)
+                table.heading(column, text=column, anchor='center')
+            for entry in entries:
                 values = valuesIn(entry)
-                self.addTableRow(tree, values)
+                log.info(f'    values={values}')
+                self.addTableRow(table, values)
+        pass
+    
+    def updateBoardEntries(self, table, entries, columns):
+        pass
+    
+    def updateListTable(self):
+        tree = self.findWidget('listTable')
+        columnsEn = [ x[0] for x in filter(lambda y: y[1], self.listColumns)]
+        if self.listStyle == 'table':
+            self.updateTableEntries(tree, self.listEntries, columnsEn)
+        elif self.listStyle == 'board':
+            self.updateBoardEntries(tree, self.listEntries, columnsEn)
+
+    def updateObject(self, jpath, obj):
+        self.objectJsonPath.set(jpath)
+        columns = ('Field', 'Value')
+        entries = [ {
+            'Field': key,
+            'Value': value
+            } for (key, value) in obj.items() ]
+        tree = self.findWidget('objectTable')
+        self.updateTableEntries(tree, entries, columns)
+        
     #--------------------------------------------------------------------
     # Action handlers
     #--------------------------------------------------------------------
@@ -112,13 +141,13 @@ class ViewControl:
         self.selectedCollection = event.widget.get()
         selector = self.app.findSelector(self.selectedCollection)
         if selector:
-            self.listJsonPath.set(selector.jsonPath)
+            self.listJsonPath.set(selector.jsonPath.replace('%s', '*'))
         else:
             self.listJsonPath.set('$.')
 
     def onListRun(self):
         args = re.findall('\[(.*?)\]', self.listJsonPath.get())
-        v = self.app.getList(self.selectedCollection, *args)
+        v = self.app.getList(self.selectedCollection, args)
         if v is None:
             self.listEntries = []
         else:
@@ -138,3 +167,26 @@ class ViewControl:
             self.listElementType = None
             self.listColumns = []
         self.updateListTable()
+
+    def onEntrySelected(self, event):
+        log.info(f'Entry selected in {event.widget}')
+        tree = event.widget
+        if tree.identify_region(event.x, event.y) == 'cell':
+            rows = tree.selection()
+            if len(rows) == 1:
+                values = tree.item(rows[0])['values']
+                c1 = tree.column('#1', option='id')
+                c2 = tree.column('#2', option='id')
+                arg = f'?@.{c1} == "{values[0]}" && @.{c2} == "{values[1]}"'
+                args = re.findall('\[(.*?)\]', self.listJsonPath.get())
+                args[-1] = arg
+                v = self.app.getList(self.selectedCollection, args)
+                if len(v) == 1:
+                    selector = self.app.findSelector(self.selectedCollection)
+                    log.info(f'  args={args}')
+                    expr = selector.jsonPath % tuple(args)
+                    log.info(f'Object found at {expr}')
+                    self.updateObject(expr, v[0])
+                else:
+                    log.warning(f'Cannot get a unique object in the list')
+                    
