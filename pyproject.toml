@@ -6,7 +6,8 @@ readme = "README.md"
 
 dependencies = [
   "typer",
-  "python-jsonpath"
+  "python-jsonpath",
+  "pillow"
   ]
 
 [project.scripts]
@@ -21,6 +22,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = [ "src/ttboard" ]
-
+include = ["src/ttboard/assets" ]
 
 

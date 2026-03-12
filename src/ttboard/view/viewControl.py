@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import filedialog
 import logging
 import re
+from .tableManager import TableManager
 
 log = logging.getLogger(__name__)
 
@@ -54,51 +55,26 @@ class ViewControl:
         else:
             log.warning(f'  Widget collectionCBox was not found')
 
-    def addTableRow(self, table, values):
-        table.insert('', 'end', values=values)
-
-    def updateTableEntries(self, table, entries, columns, allColumns=None):
-        nentries = len(entries)
-        ncolumns = len(columns)
-        log.info(f'List table {nentries} entries with {ncolumns} columns')
-
-        def valuesIn(entry):
-            values, etype = [], type(entry)
-            log.info(f'  entry type: {etype}')
-            if etype == dict:
-                log.info(f'  entry type is dict')
-                keys = entry.keys()
-                log.info(f'  keys: {keys}, columns={columns}')
-                for cname in columns:
-                    if cname in keys:
-                        log.info(f'  cname={cname} in keys')
-                        values.append(entry[cname])
-                    else:
-                        log.info(f'  cname={cname} not in keys')
-                        values.append('')
-            elif etype in (int, float, str):
-                values = [ entry ]
-            else:
-                log.warning('Do not know how to get value from {etype}')
-            return values
-
+    def updateTableEntries(self, table, tableMgr):
         if table:
             table.delete(*table.get_children())
-            ocolumns = columns # ordered columns
-            if allColumns is not None:
-                ocolumns = list(filter(lambda c: c in columns, allColumns))
+            ocolumns = tableMgr.orderedColumns()
+            log.info(f'  ordered columns: {ocolumns}')
 
-            log.info(f'ocolumns: {ocolumns}')
-            log.info(f'entries: {entries}')
-            table.config(columns=ocolumns, show='headings')
-            for column in ocolumns:
-                log.info(f'  configure columns')
-                table.column(column, width=100, anchor=tk.W)
-                table.heading(column, text=column, anchor='center')
-            for entry in entries:
-                values = valuesIn(entry)
-                log.info(f'    values={values}')
-                self.addTableRow(table, values)
+            table.config(show='tree headings', columns=ocolumns)
+            for heading in ocolumns:
+                table.heading(heading, text=heading)
+
+            table.heading('#0', text='Icon')
+            table.column('#0', minwidth=50, width=60, stretch=tk.NO)
+            entries = tableMgr.getEntries()
+            for values, image in entries:
+                if image is not None:
+                    log.info('Insert with image')
+                    table.insert('', 'end', image=image, values=values)
+                else:
+                    log.info('Insert just values')
+                    table.insert('', 'end', values=values)
         pass
     
     def updateBoardEntries(self, table, entries, columns):
@@ -109,7 +85,11 @@ class ViewControl:
         columnsEn = [ x[0] for x in filter(lambda y: y[1], self.listColumns)]
         if self.listStyle == 'table':
             allColumns = list(map(lambda x: x[0], self.listColumns))
-            self.updateTableEntries(tree, self.listEntries, columnsEn, allColumns)
+            self.listTableMgr = TableManager(columnsEn,
+                                             self.listEntries,
+                                             allColumns=allColumns,
+                                             useDeleteButton=True)
+            self.updateTableEntries(tree, self.listTableMgr)
         elif self.listStyle == 'board':
             self.updateBoardEntries(tree, self.listEntries, columnsEn)
 
@@ -120,13 +100,22 @@ class ViewControl:
         allFields = [ x[0] for x in self.listColumns ]
         fields = [ key for key in allFields if key in obj.keys() ]
         log.info(f' object fields: {fields}')
-        columns = ('Included', 'Field', 'Value')
+        columns = ('Field', 'Value', 'Included')
         entries = [ {
-            'Included': 'x',
             'Field': key,
-            'Value': obj[key]
+            'Value': obj[key],
+            'Included': True
             } for key in fields ]
-        self.updateTableEntries(tree, entries, columns)
+        entries += [ {
+            'Field': key,
+            'Value': '',
+            'Included': False
+            } for key in allFields if key not in fields ]
+
+        self.objectTableMgr = TableManager(columns,
+                                           entries,
+                                           useIncludeButton=True)
+        self.updateTableEntries(tree, self.objectTableMgr)
         
     #--------------------------------------------------------------------
     # Action handlers

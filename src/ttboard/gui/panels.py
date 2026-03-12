@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 import logging
+from .gridTable import GridTable
 
 log = logging.getLogger(__name__)
 
@@ -80,12 +81,15 @@ class ListPanel(tk.Frame):
         collection = CollectionRow(self)
         buttons = ListButtons(self)
         table = ttk.Treeview(self, columns=(1, 2, 3), show='headings')
+        #table = GridTable(self)
+        #table.setHeadings(('a', 'b', 'c'))
 
         table.bind('<Double-1>', vc.onEntrySelected)
         vc.addWidget('listTable', table)
         
         collection.build(vc)
         buttons.build(vc)
+        #table.build(vc)
         
         collection.pack(anchor=tk.NW, fill=tk.X)
         buttons.pack(side=tk.TOP)
@@ -100,9 +104,12 @@ class ObjectPanel(tk.Frame):
         jsonPath = PathRow(self)
         table = ttk.Treeview(self, columns=('Field', 'Value'),
                              show='headings')
+        #table = GridTable(self)
+        #table.setHeadings( ('Field', 'Value') )
 
         vc.addWidget('objectTable', table)
         jsonPath.build(vc)
+        #table.build(vc)
         
         label.pack(anchor=tk.NW)
         jsonPath.pack(anchor=tk.NW, fill=tk.X)
