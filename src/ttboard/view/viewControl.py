@@ -3,7 +3,7 @@ import tkinter as tk
 from tkinter import filedialog
 import logging
 import re
-from .tableManager import TableManager
+from .tableManager import TableManager, FieldManager
 
 log = logging.getLogger(__name__)
 
@@ -28,7 +28,9 @@ class ViewControl:
         self.listStyle = 'table'
         
         # Data related to an object
+        self.useIncludeButton = True
         self.objectJsonPath = tk.StringVar(value='$.')
+        self.objectKey = None
         self.objectProperties = {}
         pass
 
@@ -64,6 +66,7 @@ class ViewControl:
             table.config(show='tree headings', columns=ocolumns)
             for heading in ocolumns:
                 table.heading(heading, text=heading)
+                table.column(heading, stretch=tk.NO)
 
             table.heading('#0', text='Icon')
             table.column('#0', minwidth=50, width=60, stretch=tk.NO)
@@ -77,7 +80,9 @@ class ViewControl:
                     table.insert('', 'end', values=values)
         pass
     
-    def updateBoardEntries(self, table, entries, columns):
+    def updateFieldEntries(self, table, fieldMgr):
+        fields = fieldMgr.getFields()
+        table.updateFields(fields)
         pass
     
     def updateListTable(self):
@@ -96,26 +101,10 @@ class ViewControl:
     def updateObject(self, jpath, obj):
         self.objectJsonPath.set(jpath)
         tree = self.findWidget('objectTable')
-
         allFields = [ x[0] for x in self.listColumns ]
-        fields = [ key for key in allFields if key in obj.keys() ]
-        log.info(f' object fields: {fields}')
-        columns = ('Field', 'Value', 'Included')
-        entries = [ {
-            'Field': key,
-            'Value': obj[key],
-            'Included': True
-            } for key in fields ]
-        entries += [ {
-            'Field': key,
-            'Value': '',
-            'Included': False
-            } for key in allFields if key not in fields ]
 
-        self.objectTableMgr = TableManager(columns,
-                                           entries,
-                                           useIncludeButton=True)
-        self.updateTableEntries(tree, self.objectTableMgr)
+        self.fieldMgr = FieldManager(obj, allFields, self.useIncludeButton)
+        self.updateFieldEntries(tree, self.fieldMgr)
         
     #--------------------------------------------------------------------
     # Action handlers
@@ -186,8 +175,29 @@ class ViewControl:
                     selector = self.app.findSelector(self.selectedCollection)
                     log.info(f'  args={args}')
                     expr = selector.jsonPath % tuple(args)
-                    log.info(f'Object found at {expr}')
+                    self.objectKey = tree.index(rows[0])
+                    log.info(f'Object found at {expr} key={self.objectKey}')
                     self.updateObject(expr, v[0])
                 else:
                     log.warning(f'Cannot get a unique object in the list')
-                    
+
+    def onObjectTableEdit(self, event):
+        tree = event.widget
+        col = tree.identify_column(event.x)
+        row = tree.identify_row(event.y)
+        if row is None or col is None:
+            return
+
+        cell = tree.selection()[0]
+        
+    def onListSave(self):
+        log.info(f'Save list')
+
+    def onObjectSave(self):
+        log.info(f'Save object')
+        if self.objectKey is None:
+            # New object
+            pass
+        else:
+            # Existing object
+            pass

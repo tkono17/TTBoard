@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import ttk
 from .menu import MenuBar
 from .panels import MainPanel
 from .footer import Footer
@@ -8,7 +9,13 @@ class MainWindow(tk.Frame):
     def __init__(self, master=None, **kwargs):
         super().__init__(master, **kwargs)
         self.vc = None
+        self.style = ttk.Style()
+        self.setStyles()
 
+    def setStyles(self):
+        self.style.theme_use('clam')
+        self.style.configure('objOn.TButton', background='SeaGreen2', foreground='navy')
+        
     def build(self, vc):
         self.vc = vc
         

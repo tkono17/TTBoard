@@ -1,7 +1,8 @@
 import tkinter as tk
 from tkinter import ttk
 import logging
-from .gridTable import GridTable
+from .tables import PropsTable
+from .scroll import addScrollBar
 
 log = logging.getLogger(__name__)
 
@@ -37,7 +38,7 @@ class PathRow(tk.Frame):
         vc.addWidget('objJpathText', jpathText)
 
         jpathLabel.pack(side=tk.LEFT)
-        jpathText.pack(side=tk.LEFT, fill=tk.X)
+        jpathText.pack(side=tk.LEFT, fill=tk.X, expand=True)
         
 class EntryArray(tk.Frame):
     def __init__(self, master, n=0, **kwargs):
@@ -57,10 +58,11 @@ class ListButtons(tk.Frame):
         super().__init__(master, **kwargs)
         
     def build(self, vc):
-        button1 = ttk.Button(self, text='Filter')
-        button2 = ttk.Button(self, text='Columns')
-        button3 = ttk.Button(self, text='Run', command=vc.onListRun)
-        button4 = ttk.Button(self, text='New entry')
+        button1 = ttk.Button(self, text='Run', width=8, command=vc.onListRun)
+        button2 = ttk.Button(self, text='Filter', width=8)
+        button3 = ttk.Button(self, text='Columns', width=8)
+        button4 = ttk.Button(self, text='Save', width=8, command=vc.onListSave)
+        button5 = ttk.Button(self, text='New entry', width=10)
         grid_styles = {
             'padx': 5,
             'pady': 2
@@ -69,7 +71,23 @@ class ListButtons(tk.Frame):
         button2.grid(row=0, column=1, **grid_styles)
         button3.grid(row=0, column=2, **grid_styles)
         button4.grid(row=0, column=3, **grid_styles)
+        button5.grid(row=0, column=4, **grid_styles)
 
+class ObjectButtons(tk.Frame):
+    def __init__(self, master, **kwargs):
+        super().__init__(master, **kwargs)
+        
+    def build(self, vc):
+        button1 = ttk.Button(self, text='<', width=3, command=vc.onObjectSave)
+        button2 = ttk.Button(self, text='>', width=3, command=vc.onObjectSave)
+        button3 = ttk.Button(self, text='Save', width=6, command=vc.onObjectSave)
+        grid_styles = {
+            'padx': 5,
+            'pady': 2
+            }
+        button1.grid(row=0, column=0, **grid_styles)
+        button2.grid(row=0, column=1, **grid_styles)
+        button3.grid(row=0, column=2, **grid_styles)
         
 class ListPanel(tk.Frame):
     def __init__(self, master, **kwargs):
@@ -80,9 +98,9 @@ class ListPanel(tk.Frame):
         label.pack(anchor=tk.NW)
         collection = CollectionRow(self)
         buttons = ListButtons(self)
-        table = ttk.Treeview(self, columns=(1, 2, 3), show='headings')
-        #table = GridTable(self)
-        #table.setHeadings(('a', 'b', 'c'))
+        tableFrame = tk.Frame(self)
+        table = ttk.Treeview(tableFrame, columns=(1, 2, 3), show='headings')
+        addScrollBar(table, scrollX=True, scrollY=True)
 
         table.bind('<Double-1>', vc.onEntrySelected)
         vc.addWidget('listTable', table)
@@ -92,8 +110,8 @@ class ListPanel(tk.Frame):
         #table.build(vc)
         
         collection.pack(anchor=tk.NW, fill=tk.X)
-        buttons.pack(side=tk.TOP)
-        table.pack(anchor=tk.NW, fill=tk.BOTH, expand=True)
+        buttons.pack(anchor=tk.NW)
+        tableFrame.pack(anchor=tk.NW, fill=tk.BOTH, expand=True)
         
 class ObjectPanel(tk.Frame):
     def __init__(self, master, **kwargs):
@@ -102,18 +120,21 @@ class ObjectPanel(tk.Frame):
     def build(self, vc):
         label = tk.Label(self, text='Object view')
         jsonPath = PathRow(self)
-        table = ttk.Treeview(self, columns=('Field', 'Value'),
-                             show='headings')
-        #table = GridTable(self)
-        #table.setHeadings( ('Field', 'Value') )
+        buttons = ObjectButtons(self)
+        table = PropsTable(self, vc.useIncludeButton)
+
+        #addScrollBar(table, scrollX=True, scrollY=True)
+        table.bind('<Double-1>', vc.onObjectTableEdit)
 
         vc.addWidget('objectTable', table)
         jsonPath.build(vc)
-        #table.build(vc)
+        buttons.build(vc)
+        table.build(vc)
         
         label.pack(anchor=tk.NW)
-        jsonPath.pack(anchor=tk.NW, fill=tk.X)
-        table.pack(anchor=tk.NW, fill=tk.BOTH, expand=True)
+        jsonPath.pack(side=tk.TOP, fill=tk.X)
+        buttons.pack(side=tk.TOP, fill=tk.X)
+        table.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
         
 
 class MainPanel(tk.Frame):
