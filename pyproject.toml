@@ -7,7 +7,8 @@ readme = "README.md"
 dependencies = [
   "typer",
   "python-jsonpath",
-  "pillow"
+  "pillow",
+  "pytest"
   ]
 
 [project.scripts]
@@ -15,6 +16,7 @@ ttboard-cli = "ttboard.cli.main:main"
 ttboard-test-jsonpath = "ttboard.tests.testJsonPath:main"
 ttboard-test-selector = "ttboard.tests.testSelector:main"
 ttboard-test-appflow1 = "ttboard.tests.testAppFlow1:main"
+ttboard-test-update = "ttboard.tests.testUpdate:main"
 
 [build-system]
 requires = [ "hatchling" ]
@@ -24,4 +26,7 @@ build-backend = "hatchling.build"
 packages = [ "src/ttboard" ]
 include = ["src/ttboard/assets" ]
 
-
+[tool.pytest.ini_options]
+testpaths = [ "tests" ]
+pythonpath = [ "src" ]
+filterwarnings = [ "ignore::DeprecationWarning" ]

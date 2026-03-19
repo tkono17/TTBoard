@@ -25,6 +25,7 @@ class ViewControl:
         self.listJsonPath = tk.StringVar(value='$.')
         self.listEntries = []
         self.listColumns = []
+        self.isListSimple = None
         self.listStyle = 'table'
         
         # Data related to an object
@@ -90,13 +91,17 @@ class ViewControl:
         columnsEn = [ x[0] for x in filter(lambda y: y[1], self.listColumns)]
         if self.listStyle == 'table':
             allColumns = list(map(lambda x: x[0], self.listColumns))
+            entries = self.listEntries
+            if self.isListSimple:
+                entries = [ { 'Value': x } for x in self.listEntries ]
+                log.info(f'Updating simple list in table: {entries}')
             self.listTableMgr = TableManager(columnsEn,
-                                             self.listEntries,
+                                             entries,
                                              allColumns=allColumns,
                                              useDeleteButton=True)
             self.updateTableEntries(tree, self.listTableMgr)
         elif self.listStyle == 'board':
-            self.updateBoardEntries(tree, self.listEntries, columnsEn)
+            self.updateBoardEntries(tree, entries, columnsEn)
 
     def updateObject(self, jpath, obj):
         self.objectJsonPath.set(jpath)
@@ -148,8 +153,10 @@ class ViewControl:
             if hasattr(cls, '__dataclass_fields__'):
                 self.listColumns = [ (x, True) for x 
                                      in cls.__dataclass_fields__.keys()]
+                self.isListSimple = False
             elif cls in (int, float, str):
                 self.listColumns = [ ('Value', True) ]
+                self.isListSimple = True
             else:
                 log.warning(f'Do not know how to handle type {cls}')
         else:
@@ -165,8 +172,11 @@ class ViewControl:
             if len(rows) == 1:
                 values = tree.item(rows[0])['values']
                 c1 = tree.column('#1', option='id')
-                c2 = tree.column('#2', option='id')
-                arg = f'?@.{c1} == "{values[0]}" && @.{c2} == "{values[1]}"'
+                #c2 = tree.column('#2', option='id')
+                #arg = f'?@.{c1} == "{values[0]}" && @.{c2} == "{values[1]}"'
+                arg = f'?@.{c1} == "{values[0]}"'
+                if self.isListSimple and c1 == 'Value':
+                    arg = f'?@ == "{values[0]}"'
                 args = re.findall('\[(.*?)\]', self.listJsonPath.get())
                 args[-1] = arg
                 log.info(f' selector args: {args}')
@@ -176,8 +186,10 @@ class ViewControl:
                     log.info(f'  args={args}')
                     expr = selector.jsonPath % tuple(args)
                     self.objectKey = tree.index(rows[0])
-                    log.info(f'Object found at {expr} key={self.objectKey}')
-                    self.updateObject(expr, v[0])
+                    log.info(f'Object found at {expr} key={self.objectKey} -> {v[0]}')
+                    obj = { 'Value': v[0] } if self.isListSimple else v[0]
+                    log.info(f'  obj = {obj}')
+                    self.updateObject(expr, obj)
                 else:
                     log.warning(f'Cannot get a unique object in the list')
 

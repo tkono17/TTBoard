@@ -13,7 +13,8 @@ class TableManager:
         self.enabledColumns = columns
         self.entries = entries
         self.allColumns = allColumns
-
+        self.isEntrySimple = False
+        
         self.useIncludeButton = useIncludeButton
         self.useDeleteButton = useDeleteButton
         self.images = {
@@ -60,6 +61,7 @@ class FieldManager:
         self.useIncludeButton = useIncludeButton
 
     def getFields(self):
+        log.info(f'Field manager obj={self.obj}')
         objkeys = self.obj.keys()
         orderedFields = [ (fn, True, self.obj[fn]) for fn in self.allFields\
                           if fn in objkeys]

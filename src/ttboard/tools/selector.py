@@ -15,6 +15,15 @@ class JsonSelector:
     def expr(self, json_path, *args):
         return json_path % args
     
+    def query(self, document, *args):
+        if self.nArgs == len(args):
+            args1 = list(map(lambda x: str(x), args))
+            expr = self.expr(self.jsonPath, *args1)
+        else:
+            return None
+        x = jsonpath.query(expr, document)
+        return x
+    
     def findall(self, document, *args):
         if self.nArgs == len(args):
             args1 = list(map(lambda x: str(x), args))

@@ -1,5 +1,6 @@
 import os
 import json
+import jsonpath
 import importlib
 import logging
 from ..model import AppModel
@@ -16,8 +17,10 @@ class App:
         self.selectors = []
 
         self.currentList = None
-        self.currentObject = None
         self.listElementType = None
+        self.listMatchedPaths = None
+        
+        self.currentObject = None
         self.objectType = None
         
     def configure(self, settings=None):
@@ -31,6 +34,9 @@ class App:
             self.selectors = self.dataModule.getAllSelectors()
         pass
 
+    def findall(self, expr):
+        return jsonpath.findall(expr, self.model.document)
+    
     def loadModule(self, moduleName=None):
         m = None
         if moduleName is None and \
@@ -41,6 +47,11 @@ class App:
         if moduleName is not None:
             log.info(f'  load data module {moduleName}')
             m = importlib.import_module(moduleName)
+            if m is None and moduleName == 'TestModule':
+                dn = Path(__file__).parent.parent.parent
+                mpath = dn / 'tests/TestModule'
+                log.info(f'TestModule is a special module for test, find it at {mpath}')
+                m = importlib.import_module(mpath)
             self.dataModule = m
         else:
             m = None
@@ -58,11 +69,12 @@ class App:
 
     def saveJsonFile(self, fpath):
         dn = os.path.dirname(fpath)
+        if dn == '': dn = '.'
         if self.model.document is not None and os.path.exists(dn):
             with open(fpath, 'w', encoding='utf8') as fout:
                 json.dump(self.model.document, fout, indent=2, ensure_ascii=False)
         else:
-            log.warning(f'Try to save document to a JSON file {fn}')
+            log.warning(f'Try to save document to a JSON file {fpath}')
             dnull = self.model.document is None
             log.warning(f'    Output directory = {dn}, document null? {dnull}')
         pass
@@ -74,30 +86,42 @@ class App:
         
         nargs = selector.jsonPath.count(r'[%s]')
         if (args is None and nargs == 0) or (args is not None and len(args) == nargs):
+            v = selector.query(self.model.document, *args)
+            self.listMatchedPaths = [ x for x in v ]
             self.currentList = selector.findall(self.model.document, *args)
             self.listElementType = selector.elementType
         else:
             self.currentList = None
             self.listElementType = None
+            self.listMatchedPaths = None
         return self.currentList
-            
+
     def findSelector(self, sname):
         selector = None
         v = list(filter(lambda x: x.name == sname, self.selectors))
         if len(v) == 1:
             selector = v[0]
         return selector
-    
-    def addList(self, name, data):
-        v = map(lambda x: x.name == name, self.selectors)
-        selector = v[0] if len(v) >= 1 else None
-        x = selector.findParent(self.model.document)
-        if x is not None:
-            x.append(data)
+
+    def setFieldValue(self, jpath, value):
+        matches = jsonpath.query(jpath, self.model.document)
+        matches = list(matches)
+        match len(matches):
+            case 0:
+                log.warning(f'  JSONPath {jpath} returned zero matches')
+                return None
+            case 1:
+                pointer = matches[0].pointer()
+                parent = pointer.resolve_parent(self.model.document)
+                key = str(pointer).split('/')[-1]
+                if parent is None or key is None:
+                    log.warning(f'  JSONPath {jpath} ->  parent or key is None')
+                    return None
+                if type(parent) == list:
+                    parent[int(key)] = value
+                else:
+                    parent[key] = value
+            case _:
+                log.warning(f'  JSONPath {jpath} returned more than 1 matches')
+                return None
             
-    def addObject(self, name, data):
-        v = map(lambda x: x.name == name, self.selectors)
-        selector = v[0] if len(v) >= 1 else None
-        x = selector.findParent(self.model.document)
-        if x is not None:
-            x.append(data)
