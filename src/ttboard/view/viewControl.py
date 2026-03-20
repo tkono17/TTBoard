@@ -4,6 +4,7 @@ from tkinter import filedialog
 import logging
 import re
 from .tableManager import TableManager, FieldManager
+from .vmodel import ViewModel
 
 log = logging.getLogger(__name__)
 
@@ -19,21 +20,8 @@ class ViewControl:
         self.fileTypes = [ ('JSON file', '*.json'), ('', '*') ]
         self.fileDirName = os.getcwd()
 
-        # Data related to a list
-        self.selectorNames = []
-        self.selectedCollection = None
-        self.listJsonPath = tk.StringVar(value='$.')
-        self.listEntries = []
-        self.listColumns = []
-        self.isListSimple = None
-        self.listStyle = 'table'
-        
-        # Data related to an object
-        self.useIncludeButton = True
-        self.objectJsonPath = tk.StringVar(value='$.')
-        self.objectKey = None
-        self.objectProperties = {}
-        pass
+        # Data related to panels
+        self.vmodel = ViewModel()
 
     def addWidget(self, wname, w):
         self.widgets[wname] = w
@@ -50,11 +38,13 @@ class ViewControl:
         return w
         
     def updateCollections(self):
-        self.selectorNames = list(map(lambda x: x.name, self.app.selectors))
+        ldata = self.vmodel.listView
+        
+        ldata.selectorNames = list(map(lambda x: x.name, self.app.selectors))
         self.gui.mainPanel.listPanel
         w = self.findWidget('collectionCBox')
         if w:
-            w['values'] = self.selectorNames
+            w['values'] = ldata.selectorNames
         else:
             log.warning(f'  Widget collectionCBox was not found')
 
@@ -87,28 +77,33 @@ class ViewControl:
         pass
     
     def updateListTable(self):
+        ldata = self.vmodel.listView
+        
         tree = self.findWidget('listTable')
-        columnsEn = [ x[0] for x in filter(lambda y: y[1], self.listColumns)]
-        if self.listStyle == 'table':
-            allColumns = list(map(lambda x: x[0], self.listColumns))
-            entries = self.listEntries
-            if self.isListSimple:
-                entries = [ { 'Value': x } for x in self.listEntries ]
+        columnsEn = [ x[0] for x in filter(lambda y: y[1], ldata.fieldStates)]
+        if ldata.displayStyle == 'table':
+            allColumns = list(map(lambda x: x[0], ldata.fieldStates))
+            entries = ldata.entries
+            if ldata.isSimpleEntry():
+                entries = [ { 'Value': x } for x in ldata.entries ]
                 log.info(f'Updating simple list in table: {entries}')
             self.listTableMgr = TableManager(columnsEn,
                                              entries,
                                              allColumns=allColumns,
                                              useDeleteButton=True)
             self.updateTableEntries(tree, self.listTableMgr)
-        elif self.listStyle == 'board':
+        elif ldata.displayStyle == 'board':
             self.updateBoardEntries(tree, entries, columnsEn)
 
     def updateObject(self, jpath, obj):
-        self.objectJsonPath.set(jpath)
+        ldata = self.vmodel.listView
+        fdata = self.vmodel.fieldView
+        
+        fdata.jsonPath.set(jpath)
         tree = self.findWidget('objectTable')
-        allFields = [ x[0] for x in self.listColumns ]
+        allFields = [ x[0] for x in ldata.fieldStates ]
 
-        self.fieldMgr = FieldManager(obj, allFields, self.useIncludeButton)
+        self.fieldMgr = FieldManager(obj, allFields, fdata.useIncludeButton)
         self.updateFieldEntries(tree, self.fieldMgr)
         
     #--------------------------------------------------------------------
@@ -132,66 +127,55 @@ class ViewControl:
         print('File->Quit')
 
     def onCollectionSelected(self, event):
-        self.selectedCollection = event.widget.get()
-        selector = self.app.findSelector(self.selectedCollection)
+        ldata = self.vmodel.listView
+        
+        ldata.collection.set(event.widget.get())
+        selector = self.app.findSelector(ldata.collection.get())
         if selector:
-            self.listJsonPath.set(selector.jsonPath.replace('%s', '*'))
+            ldata.jsonPath.set(selector.jsonPath.replace('%s', '*'))
         else:
-            self.listJsonPath.set('$.')
+            ldata.jsonPath.set('$.')
 
     def onListRun(self):
-        args = re.findall('\[(.*?)\]', self.listJsonPath.get())
-        v = self.app.getList(self.selectedCollection, args)
+        ldata = self.vmodel.listView
+        
+        args = re.findall(r'\[(.*?)\]', ldata.jsonPath.get())
+        v = self.app.getList(ldata.collection.get(), args)
+        selector = self.app.findSelector(ldata.collection.get())
         if v is None:
-            self.listEntries = []
+            ldata.entries = []
+            ldata.matches = None
         else:
-            self.listEntries = v
-        selector = self.app.findSelector(self.selectedCollection)
+            ldata.entries = v
+            ldata.matches = self.app.listMatches
+            log.info(f'  Matches: {ldata.matches}')
         if selector:
             cls = selector.elementType
-            self.listElementType = cls
+            ldata.entryType = cls
             if hasattr(cls, '__dataclass_fields__'):
-                self.listColumns = [ (x, True) for x 
+                ldata.fieldStates = [ (x, True) for x 
                                      in cls.__dataclass_fields__.keys()]
-                self.isListSimple = False
             elif cls in (int, float, str):
-                self.listColumns = [ ('Value', True) ]
-                self.isListSimple = True
+                ldata.fieldStates = [ ('Value', True) ]
             else:
                 log.warning(f'Do not know how to handle type {cls}')
         else:
-            self.listElementType = None
-            self.listColumns = []
+            ldata.fieldStates = []
         self.updateListTable()
 
     def onEntrySelected(self, event):
+        ldata = self.vmodel.listView
+        
         log.info(f'Entry selected in {event.widget}')
         tree = event.widget
         if tree.identify_region(event.x, event.y) == 'cell':
             rows = tree.selection()
             if len(rows) == 1:
-                values = tree.item(rows[0])['values']
-                c1 = tree.column('#1', option='id')
-                #c2 = tree.column('#2', option='id')
-                #arg = f'?@.{c1} == "{values[0]}" && @.{c2} == "{values[1]}"'
-                arg = f'?@.{c1} == "{values[0]}"'
-                if self.isListSimple and c1 == 'Value':
-                    arg = f'?@ == "{values[0]}"'
-                args = re.findall('\[(.*?)\]', self.listJsonPath.get())
-                args[-1] = arg
-                log.info(f' selector args: {args}')
-                v = self.app.getList(self.selectedCollection, args)
-                if len(v) == 1:
-                    selector = self.app.findSelector(self.selectedCollection)
-                    log.info(f'  args={args}')
-                    expr = selector.jsonPath % tuple(args)
-                    self.objectKey = tree.index(rows[0])
-                    log.info(f'Object found at {expr} key={self.objectKey} -> {v[0]}')
-                    obj = { 'Value': v[0] } if self.isListSimple else v[0]
-                    log.info(f'  obj = {obj}')
-                    self.updateObject(expr, obj)
-                else:
-                    log.warning(f'Cannot get a unique object in the list')
+                irow = tree.index(rows[0])
+                jpath = ldata.matches[irow] if len(ldata.matches)>=(irow+1) else ''
+                obj = { 'Value': str(obj) } if ldata.isSimpleEntry() \
+                    else ldata.entries[irow]
+                self.updateObject(jpath.path, obj)
 
     def onObjectTableEdit(self, event):
         tree = event.widget
@@ -199,7 +183,6 @@ class ViewControl:
         row = tree.identify_row(event.y)
         if row is None or col is None:
             return
-
         cell = tree.selection()[0]
         
     def onListSave(self):
@@ -207,7 +190,7 @@ class ViewControl:
 
     def onObjectSave(self):
         log.info(f'Save object')
-        if self.objectKey is None:
+        if False:
             # New object
             pass
         else:

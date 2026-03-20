@@ -1,4 +1,4 @@
-import os
+import os, sys
 import json
 import jsonpath
 import importlib
@@ -18,7 +18,7 @@ class App:
 
         self.currentList = None
         self.listElementType = None
-        self.listMatchedPaths = None
+        self.listMatches = None
         
         self.currentObject = None
         self.objectType = None
@@ -45,7 +45,9 @@ class App:
            "dataModule" in self.model.document["metadata"].keys():
             moduleName = self.model.document["metadata"]["dataModule"]
         if moduleName is not None:
-            log.info(f'  load data module {moduleName}')
+            if '' not in sys.path:
+                sys.path = [''] + sys.path
+            log.info(f'  load data module {moduleName} in {sys.path}')
             m = importlib.import_module(moduleName)
             if m is None and moduleName == 'TestModule':
                 dn = Path(__file__).parent.parent.parent
@@ -87,13 +89,13 @@ class App:
         nargs = selector.jsonPath.count(r'[%s]')
         if (args is None and nargs == 0) or (args is not None and len(args) == nargs):
             v = selector.query(self.model.document, *args)
-            self.listMatchedPaths = [ x for x in v ]
+            self.listMatches = [ x for x in v ]
             self.currentList = selector.findall(self.model.document, *args)
             self.listElementType = selector.elementType
         else:
             self.currentList = None
             self.listElementType = None
-            self.listMatchedPaths = None
+            self.listMatches = None
         return self.currentList
 
     def findSelector(self, sname):

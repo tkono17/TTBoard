@@ -11,13 +11,16 @@ class CollectionRow(tk.Frame):
         super().__init__(master, **kwargs)
         
     def build(self, vc):
+        ldata = vc.vmodel.listView
+        
         label = tk.Label(self, text='Collections: ')
         combobox = ttk.Combobox(self, values=None,
-                                textvariable=vc.selectedCollection)
+                                textvariable=ldata.collection)
         combobox.bind('<<ComboboxSelected>>', vc.onCollectionSelected)
 
         jpathLabel = tk.Label(self, text='JSONPath: ')
-        jpathText = tk.Entry(self, textvariable=vc.listJsonPath)
+        jpathText = tk.Entry(self, textvariable=ldata.jsonPath)
+        ldata.jsonPath.set('$.*')
 
         vc.addWidget('collectionCBox', combobox)
         vc.addWidget('listJpathText', jpathText)
@@ -32,8 +35,10 @@ class PathRow(tk.Frame):
         super().__init__(master, **kwargs)
         
     def build(self, vc):
+        fdata = vc.vmodel.fieldView
+        
         jpathLabel = tk.Label(self, text='JSONPath: ')
-        jpathText = tk.Entry(self, textvariable=vc.objectJsonPath)
+        jpathText = tk.Entry(self, textvariable=fdata.jsonPath)
 
         vc.addWidget('objJpathText', jpathText)
 
@@ -118,10 +123,12 @@ class ObjectPanel(tk.Frame):
         super().__init__(master, **kwargs)
 
     def build(self, vc):
+        fdata = vc.vmodel.fieldView
+        
         label = tk.Label(self, text='Object view')
         jsonPath = PathRow(self)
         buttons = ObjectButtons(self)
-        table = PropsTable(self, vc.useIncludeButton)
+        table = PropsTable(self, fdata.useIncludeButton)
 
         #addScrollBar(table, scrollX=True, scrollY=True)
         table.bind('<Double-1>', vc.onObjectTableEdit)

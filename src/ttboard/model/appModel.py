@@ -10,8 +10,8 @@ class AppModel:
     extraModules: list[Any] | None = None
     
     documentPath: Optional[str] = None
-    document: Optional[dict[str, Any]] = None
     #
+    document: Optional[dict[str, Any]] = None
     selectors: list[JsonSelector] | None = None
 
     

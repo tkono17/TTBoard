@@ -46,7 +46,7 @@ def test_update_field(app):
     newName = 'Andy'
     i = 0
     v = app.getList('objects', (str(i)))
-    m = app.listMatchedPaths[i]
+    m = app.listMatches[i]
     m.pointer().resolve(app.model.document)['name'] = newName
     app.saveJsonFile(outputJsonFile)
 
