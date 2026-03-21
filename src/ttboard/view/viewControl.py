@@ -2,6 +2,7 @@ import os
 from dataclasses import fields, MISSING
 import tkinter as tk
 from tkinter import filedialog
+import jsonpath
 import logging
 import re
 from .tableManager import TableManager, FieldsManager
@@ -258,29 +259,35 @@ class ViewControl:
         
     def onSaveFields(self, event):
         fview = self.vmodel.fieldView
+        fdata = self.app.model.fieldsData
+
         log.info(f'Save object')
         cpath = fview.containerPath.get()
         modified = False
+        matches = jsonpath.query(cpath, self.app.model.document)
+        cont = None
+        if matches is not None:
+            matches = list(matches)
+            jpointer = matches[0].pointer()
+            cont = jpointer.resolve(self.app.model.document)
         if fview.state == 'New':
-            if fview.isEntrySimple():
-                value = fview.fields['Value']
-                jpointer = cpath.pointer()
-                cont = jpointer.resolve(self.app.model.document)
+            if fdata.isEntrySimple():
+                value = fview.rows[0].value.get()
                 cont.append(value)
             else:
-                cont.update(fview.fields)
+                for row in fview.rows:
+                    cont[row.name] = row.value.get()
             modified = True
         elif fview.state == 'Modified':
-            if fview.isEntrySimple():
-                value = fview.fields['Value']
-                jpointer = cpath.pointer()
-                cont = jpointer.resolve(self.app.model.document)
+            if fdata.isEntrySimple():
+                value = fview.rows[0].value
                 if fview.key is not None:
-                    cont[fview.key] = value
+                    cont[fview.key] = value.get()
                 else:
                     log.warning(f'Key is null for simple value in a list {fview.cpath}')
             else:
-                cont.update(fview.fields)
+                for row in fview.rows:
+                    cont[row.name] = row.value.get()
             modified = True
         modified = True
         if modified:
