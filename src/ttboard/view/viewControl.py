@@ -1,10 +1,11 @@
 import os
+from dataclasses import fields, MISSING
 import tkinter as tk
 from tkinter import filedialog
 import logging
 import re
-from .tableManager import TableManager, FieldManager
-from .vmodel import ViewModel
+from .tableManager import TableManager, FieldsManager
+from .vmodel import ViewModel, FieldState, FieldRow
 
 log = logging.getLogger(__name__)
 
@@ -38,13 +39,10 @@ class ViewControl:
         return w
         
     def updateCollections(self):
-        ldata = self.vmodel.listView
-        
-        ldata.selectorNames = list(map(lambda x: x.name, self.app.selectors))
-        self.gui.mainPanel.listPanel
+        selectorNames = self.app.selectorNames()
         w = self.findWidget('collectionCBox')
         if w:
-            w['values'] = ldata.selectorNames
+            w['values'] = selectorNames
         else:
             log.warning(f'  Widget collectionCBox was not found')
 
@@ -72,38 +70,61 @@ class ViewControl:
         pass
     
     def updateFieldEntries(self, table, fieldMgr):
-        fields = fieldMgr.getFields()
-        table.updateFields(fields)
+        fview = self.vmodel.fieldView
+        fview.updateRows()
+        log.info(f'  updated fields: {fview.orderedFields()}')
+        log.info(f'  updated rows: {fieldMgr.model.rows}')
+        table.updateFields(fieldMgr.rows(), self)
         pass
     
     def updateListTable(self):
-        ldata = self.vmodel.listView
-        
+        lview = self.vmodel.listView
+        ldata = self.app.model.listData
+
+        if self.app.isListSimple():
+            lview.fieldStates = [ FieldState('Value', True) ]
+        else:
+            lview.fieldStates = [
+                FieldState(f.name, True) for f in fields(ldata.elementType)
+                ]
         tree = self.findWidget('listTable')
-        columnsEn = [ x[0] for x in filter(lambda y: y[1], ldata.fieldStates)]
-        if ldata.displayStyle == 'table':
-            allColumns = list(map(lambda x: x[0], ldata.fieldStates))
-            entries = ldata.entries
-            if ldata.isSimpleEntry():
+        columnsEn = [ x.name for x in filter(lambda y: y.isActive, lview.fieldStates)]
+        if lview.displayStyle == 'table':
+            allColumns = list(map(lambda x: x.name, lview.fieldStates))
+            entries = self.app.listEntries()
+            if self.app.isListSimple():
                 entries = [ { 'Value': x } for x in ldata.entries ]
-                log.info(f'Updating simple list in table: {entries}')
+            log.info(f'Updating simple list in table: {entries}')
             self.listTableMgr = TableManager(columnsEn,
                                              entries,
                                              allColumns=allColumns,
                                              useDeleteButton=True)
             self.updateTableEntries(tree, self.listTableMgr)
-        elif ldata.displayStyle == 'board':
+        elif lview.displayStyle == 'board':
             self.updateBoardEntries(tree, entries, columnsEn)
 
-    def updateObject(self, jpath, obj):
-        ldata = self.vmodel.listView
-        fdata = self.vmodel.fieldView
-        
-        fdata.jsonPath.set(jpath)
-        tree = self.findWidget('objectTable')
-        allFields = [ x[0] for x in ldata.fieldStates ]
+    def selectObject(self):
+        ldata = self.app.model.listData
+        lview = self.vmodel.listView
+        fview = self.vmodel.fieldView
 
-        self.fieldMgr = FieldManager(obj, allFields, fdata.useIncludeButton)
+        obj = ldata.entry
+        keys = obj.keys()
+        rows = []
+        for fs in lview.fieldStates:
+            included, value = False, ''
+            if fs.name in keys:
+                included = True
+                value = obj[fs.name]
+            frow = FieldRow(included, fs.name, tk.StringVar(value=str(value)))
+            rows.append(frow)
+        fview.rows = rows
+        log.info(f'  fview = {fview}, rows={fview.rows}')
+        
+    def updateObject(self):
+        fview = self.vmodel.fieldView
+        self.fieldMgr = FieldsManager(fview)
+        tree = self.findWidget('objectTable')
         self.updateFieldEntries(tree, self.fieldMgr)
         
     #--------------------------------------------------------------------
@@ -127,44 +148,47 @@ class ViewControl:
         print('File->Quit')
 
     def onCollectionSelected(self, event):
-        ldata = self.vmodel.listView
+        lview = self.vmodel.listView
         
-        ldata.collection.set(event.widget.get())
-        selector = self.app.findSelector(ldata.collection.get())
+        lview.collection.set(event.widget.get())
+        selector = self.app.findSelector(lview.collection.get())
         if selector:
-            ldata.jsonPath.set(selector.jsonPath.replace('%s', '*'))
+            lview.jsonPath.set(selector.jsonPath.replace('%s', '*'))
         else:
-            ldata.jsonPath.set('$.')
+            lview.jsonPath.set('$.')
 
     def onListRun(self):
-        ldata = self.vmodel.listView
+        lview = self.vmodel.listView
+        ldata = self.app.model.listData
         
-        args = re.findall(r'\[(.*?)\]', ldata.jsonPath.get())
-        v = self.app.getList(ldata.collection.get(), args)
-        selector = self.app.findSelector(ldata.collection.get())
+        args = re.findall(r'\[(.*?)\]', lview.jsonPath.get())
+        v = self.app.getList(lview.collection.get(), args)
+        selector = self.app.findSelector(lview.collection.get())
         if v is None:
             ldata.entries = []
-            ldata.matches = None
+            ldata.jsonMatches = None
         else:
             ldata.entries = v
-            ldata.matches = self.app.listMatches
-            log.info(f'  Matches: {ldata.matches}')
+            ldata.jsonMatches = self.app.listMatches
+            log.info(f'  Matches: {ldata.jsonMatches}')
         if selector:
             cls = selector.elementType
-            ldata.entryType = cls
+            ldata.elementType = cls
             if hasattr(cls, '__dataclass_fields__'):
-                ldata.fieldStates = [ (x, True) for x 
+                lview.fieldStates = [ (x, True) for x 
                                      in cls.__dataclass_fields__.keys()]
             elif cls in (int, float, str):
-                ldata.fieldStates = [ ('Value', True) ]
+                lview.fieldStates = [ ('Value', True) ]
             else:
                 log.warning(f'Do not know how to handle type {cls}')
         else:
-            ldata.fieldStates = []
+            log.warning(f'No selector for list {lview.collection.get()}')
+            lview.fieldStates = []
         self.updateListTable()
 
     def onEntrySelected(self, event):
-        ldata = self.vmodel.listView
+        ldata = self.app.model.listData
+        fview = self.vmodel.fieldView
         
         log.info(f'Entry selected in {event.widget}')
         tree = event.widget
@@ -172,27 +196,93 @@ class ViewControl:
             rows = tree.selection()
             if len(rows) == 1:
                 irow = tree.index(rows[0])
-                jpath = ldata.matches[irow] if len(ldata.matches)>=(irow+1) else ''
-                obj = { 'Value': str(obj) } if ldata.isSimpleEntry() \
-                    else ldata.entries[irow]
-                self.updateObject(jpath.path, obj)
+                jmatch = ldata.jsonMatches[irow]
+                entry = ldata.entries[irow]
+                containerPath = ldata.containerPath(irow)
+                pobj = {}
+                if self.app.isListSimple():
+                    obj = { 'Value': str(entry) }
+                else:
+                    obj = entry
+                fview.containerPath.set(containerPath)
+                fview.key = None
+                fview.state = 'Set'
+                ldata.entry = obj
+                self.selectObject()
+                self.updateObject()
 
-    def onObjectTableEdit(self, event):
-        tree = event.widget
-        col = tree.identify_column(event.x)
-        row = tree.identify_row(event.y)
-        if row is None or col is None:
-            return
-        cell = tree.selection()[0]
+    def onDeleteEntry(self):
+        ldata = self.app.model.listData
+    
+    def onFieldClicked(self, irow, event):
+        log.info(f'Field clicked {event.widget} irow={irow}')
+        fview = self.vmodel.fieldView
+        fview.rows[irow].isActive = not fview.rows[irow].isActive
+        self.updateObject()
+
+    def onNewEntry(self):
+        ldata = self.app.model.listData
+        lview = self.vmodel.listView
+        fview = self.vmodel.fieldView
+        
+        jpath = lview.jsonPath.get()
+        log.info(f'Find parent path of {jpath}')
+        cpath = None
+        obj = None
+        if hasattr(ldata.elementType, '__dataclass_fields__'):
+            obj = {
+                f.name: '' for f in fields(ldata.elementType) \
+                if (f.default is MISSING and f.default_factory is MISSING)
+            }
+            cpath = ldata.containerPath()
+        elif ldata.elementType == list:
+            obj = { '[]': '[]' }
+            cpath = ldata.containerPath()
+        else:
+            obj = { '[]': ''}
+            cpath = ldata.containerPath()
+        fview.containerPath.set(cpath)
+        fview.key = None
+        ldata.entry = obj
+        fview.state = 'New'
+        self.selectObject()
+        self.updateObject()
         
     def onListSave(self):
         log.info(f'Save list')
 
-    def onObjectSave(self):
+    def onFieldChanged(self, *args):
+        log.info(f'Field changed')
+        fview = self.vmodel.fieldView
+        fview.state = 'Modified'
+        
+    def onSaveFields(self, event):
+        fview = self.vmodel.fieldView
         log.info(f'Save object')
-        if False:
-            # New object
-            pass
-        else:
-            # Existing object
-            pass
+        cpath = fview.containerPath.get()
+        modified = False
+        if fview.state == 'New':
+            if fview.isEntrySimple():
+                value = fview.fields['Value']
+                jpointer = cpath.pointer()
+                cont = jpointer.resolve(self.app.model.document)
+                cont.append(value)
+            else:
+                cont.update(fview.fields)
+            modified = True
+        elif fview.state == 'Modified':
+            if fview.isEntrySimple():
+                value = fview.fields['Value']
+                jpointer = cpath.pointer()
+                cont = jpointer.resolve(self.app.model.document)
+                if fview.key is not None:
+                    cont[fview.key] = value
+                else:
+                    log.warning(f'Key is null for simple value in a list {fview.cpath}')
+            else:
+                cont.update(fview.fields)
+            modified = True
+        modified = True
+        if modified:
+            fn = self.app.model.documentPath+'.tmp'
+            self.app.saveJsonFile(fn)

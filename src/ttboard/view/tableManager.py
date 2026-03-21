@@ -53,18 +53,13 @@ class TableManager:
                 v.append('')
         return (v, image)
         
-class FieldManager:
-    def __init__(self, obj, allFields, cls=None,
-                 useIncludeButton = False):
-        self.obj = obj
-        self.allFields = allFields
-        self.useIncludeButton = useIncludeButton
+class FieldsManager:
+    def __init__(self, fieldsViewModel):
+        self.model = fieldsViewModel
 
-    def getFields(self):
-        log.info(f'Field manager obj={self.obj}')
-        objkeys = self.obj.keys()
-        orderedFields = [ (fn, True, self.obj[fn]) for fn in self.allFields\
-                          if fn in objkeys]
-        orderedFields += [ (fn, False, '') for fn in self.allFields\
-                          if fn not in objkeys]
-        return orderedFields
+    def useIncludButton(self):
+        return self.model.useIncludeButton
+
+    def rows(self):
+        return self.model.rows
+    

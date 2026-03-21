@@ -11,16 +11,16 @@ class CollectionRow(tk.Frame):
         super().__init__(master, **kwargs)
         
     def build(self, vc):
-        ldata = vc.vmodel.listView
+        lview = vc.vmodel.listView
         
         label = tk.Label(self, text='Collections: ')
         combobox = ttk.Combobox(self, values=None,
-                                textvariable=ldata.collection)
+                                textvariable=lview.collection)
         combobox.bind('<<ComboboxSelected>>', vc.onCollectionSelected)
 
         jpathLabel = tk.Label(self, text='JSONPath: ')
-        jpathText = tk.Entry(self, textvariable=ldata.jsonPath)
-        ldata.jsonPath.set('$.*')
+        jpathText = tk.Entry(self, textvariable=lview.jsonPath)
+        lview.jsonPath.set('$.*')
 
         vc.addWidget('collectionCBox', combobox)
         vc.addWidget('listJpathText', jpathText)
@@ -35,10 +35,10 @@ class PathRow(tk.Frame):
         super().__init__(master, **kwargs)
         
     def build(self, vc):
-        fdata = vc.vmodel.fieldView
+        fview = vc.vmodel.fieldView
         
         jpathLabel = tk.Label(self, text='JSONPath: ')
-        jpathText = tk.Entry(self, textvariable=fdata.jsonPath)
+        jpathText = tk.Entry(self, textvariable=fview.containerPath)
 
         vc.addWidget('objJpathText', jpathText)
 
@@ -67,7 +67,7 @@ class ListButtons(tk.Frame):
         button2 = ttk.Button(self, text='Filter', width=8)
         button3 = ttk.Button(self, text='Columns', width=8)
         button4 = ttk.Button(self, text='Save', width=8, command=vc.onListSave)
-        button5 = ttk.Button(self, text='New entry', width=10)
+        button5 = ttk.Button(self, text='New entry', width=10, command=vc.onNewEntry)
         grid_styles = {
             'padx': 5,
             'pady': 2
@@ -83,16 +83,16 @@ class ObjectButtons(tk.Frame):
         super().__init__(master, **kwargs)
         
     def build(self, vc):
-        button1 = ttk.Button(self, text='<', width=3, command=vc.onObjectSave)
-        button2 = ttk.Button(self, text='>', width=3, command=vc.onObjectSave)
-        button3 = ttk.Button(self, text='Save', width=6, command=vc.onObjectSave)
+        self.button1 = ttk.Button(self, text='<', width=3)
+        self.button2 = ttk.Button(self, text='>', width=3)
+        self.button3 = ttk.Button(self, text='Save', width=6)
         grid_styles = {
             'padx': 5,
             'pady': 2
             }
-        button1.grid(row=0, column=0, **grid_styles)
-        button2.grid(row=0, column=1, **grid_styles)
-        button3.grid(row=0, column=2, **grid_styles)
+        self.button1.grid(row=0, column=0, **grid_styles)
+        self.button2.grid(row=0, column=1, **grid_styles)
+        self.button3.grid(row=0, column=2, **grid_styles)
         
 class ListPanel(tk.Frame):
     def __init__(self, master, **kwargs):
@@ -123,16 +123,16 @@ class ObjectPanel(tk.Frame):
         super().__init__(master, **kwargs)
 
     def build(self, vc):
-        fdata = vc.vmodel.fieldView
+        fview = vc.vmodel.fieldView
         
         label = tk.Label(self, text='Object view')
         jsonPath = PathRow(self)
         buttons = ObjectButtons(self)
-        table = PropsTable(self, fdata.useIncludeButton)
+        table = PropsTable(self, fview.useIncludeButton)
 
         #addScrollBar(table, scrollX=True, scrollY=True)
-        table.bind('<Double-1>', vc.onObjectTableEdit)
-
+        #table.bind('<Double-1>', vc.onObjectTableEdit)
+        
         vc.addWidget('objectTable', table)
         jsonPath.build(vc)
         buttons.build(vc)
@@ -143,6 +143,7 @@ class ObjectPanel(tk.Frame):
         buttons.pack(side=tk.TOP, fill=tk.X)
         table.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
         
+        buttons.button3.bind('<Button-1>', vc.onSaveFields)
 
 class MainPanel(tk.Frame):
     def __init__(self, master, **kwargs):

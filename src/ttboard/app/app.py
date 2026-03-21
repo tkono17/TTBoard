@@ -12,26 +12,29 @@ class App:
         #self.settings = AppSettings()
         self.model = AppModel('TTBoard')
         
-        self.dataModule = None
-        self.documentClass = None
-        self.selectors = []
+        self.model.dataModule = None
+        self.model.documentClass = None
+        self.model.selectors = []
 
-        self.currentList = None
-        self.listElementType = None
-        self.listMatches = None
+        self.model.listData.jsonPath = None
+        self.model.listData.jsonMatches = None
+        self.model.listData.entires = None
+        self.model.listData.elementType = None
         
-        self.currentObject = None
-        self.objectType = None
-        
+        self.model.fieldsData.jsonPath = None
+        self.model.fieldsData.jsonMatch = None
+        self.model.fieldsData.fields = None
+        self.model.fieldsData.elementType = None
+
     def configure(self, settings=None):
         pass
 
     def initialize(self):
-        self.documentClass = None
-        self.selectors = None
-        if self.dataModule is not None:
-            self.documentClass = self.dataModule.getDocumentClass()
-            self.selectors = self.dataModule.getAllSelectors()
+        self.model.documentClass = None
+        self.model.selectors = None
+        if self.model.dataModule is not None:
+            self.model.documentClass = self.model.dataModule.getDocumentClass()
+            self.model.selectors = self.model.dataModule.getAllSelectors()
         pass
 
     def findall(self, expr):
@@ -54,7 +57,7 @@ class App:
                 mpath = dn / 'tests/TestModule'
                 log.info(f'TestModule is a special module for test, find it at {mpath}')
                 m = importlib.import_module(mpath)
-            self.dataModule = m
+            self.model.dataModule = m
         else:
             m = None
         return m
@@ -62,6 +65,7 @@ class App:
     def openJsonFile(self, fpath):
         if os.path.exists(fpath):
             with open(fpath, 'r') as fin:
+                self.model.documentPath = fpath
                 self.model.document = json.load(fin)
             self.loadModule()
             self.initialize()
@@ -81,8 +85,23 @@ class App:
             log.warning(f'    Output directory = {dn}, document null? {dnull}')
         pass
 
+    def collectionName(self):
+        return self.model.listData.collection
+    
+    def selectorNames(self):
+        return list(map(lambda x: x.name, self.model.selectors))
+
+    def isListSimple(self):
+        ldata = self.model.listData
+        return ldata.isListSimple()
+
+    def listEntries(self):
+        return self.model.listData.entries
+    
     def getList(self, selectorName, args):
-        selectors1 = filter(lambda x: x.name == selectorName, self.selectors)
+        listData = self.model.listData
+        
+        selectors1 = filter(lambda x: x.name == selectorName, self.model.selectors)
         selectors1 = list(selectors1)
         selector = selectors1[0] if len(selectors1)>0 else None
         
@@ -90,17 +109,17 @@ class App:
         if (args is None and nargs == 0) or (args is not None and len(args) == nargs):
             v = selector.query(self.model.document, *args)
             self.listMatches = [ x for x in v ]
-            self.currentList = selector.findall(self.model.document, *args)
+            listData.currentList = selector.findall(self.model.document, *args)
             self.listElementType = selector.elementType
         else:
-            self.currentList = None
+            listData.currentList = None
             self.listElementType = None
             self.listMatches = None
-        return self.currentList
+        return listData.currentList
 
     def findSelector(self, sname):
         selector = None
-        v = list(filter(lambda x: x.name == sname, self.selectors))
+        v = list(filter(lambda x: x.name == sname, self.model.selectors))
         if len(v) == 1:
             selector = v[0]
         return selector

@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
+from functools import partial
 import logging
 from ..tools import openAssetImage
 
@@ -16,23 +17,24 @@ class PropsTable(tk.Frame):
         self.headings = None
         self.rows = []
 
-    def valueWidget(self, value):
+    def valueWidget(self, var, vc):
         w = None
         bgcolor = 'white smoke'
-        tvalue = type(value)
-        if tvalue in (int, float, str):
-            w = tk.Entry(self, bg=bgcolor)
-            w.insert(0, value)
+        tvalue = type(var)
+        log.info(f'value for props is {tvalue}')
+        if tvalue == tk.StringVar:
+            w = tk.Entry(self, textvariable=var, bg=bgcolor)
+            var.trace_add('write', vc.onFieldChanged)
         elif tvalue == list:
             w = ttk.Button(self, text='Show list', style='objOn.TButton')
         elif tvalue == dict:
             w = ttk.Button(self, text='Open object', style='objOn.TButton')
         return w
     
-    def addField(self, irow, field):
-        log.info(f'addField {field}')
+    def addField(self, irow, row_data, vc):
+        log.info(f'addField {row_data}')
         bgcolor = 'white smoke'
-        key, included, value = field
+        included, key, value = row_data.isActive, row_data.name, row_data.value
         image = None
         if included:
             image = self.images['CheckBoxChecked']
@@ -40,11 +42,9 @@ class PropsTable(tk.Frame):
             image = self.images['EmptyCheckBox']
             bgcolor = 'light gray'
 
-        log.info(f'  add field {field}')
-        log.info(f'    value: {value}')
         image0 = tk.Label(self, image=image, bg=bgcolor)
         label1 = tk.Label(self, text=key, bg=bgcolor)
-        w2 = self.valueWidget(value)
+        w2 = self.valueWidget(value, vc)
         
         col0 = 0
         if self.useInclude:
@@ -52,13 +52,14 @@ class PropsTable(tk.Frame):
             col0 = 1
         label1.grid(row=irow, column=col0+0, sticky=tk.NSEW)
         w2.grid(row=irow, column=col0+1, sticky=tk.NSEW)
-        
+
+        image0.bind('<Button-1>', partial(vc.onFieldClicked, irow-1))
             
-    def updateFields(self, fields):
+    def updateFields(self, rows_data, vc):
         self.clear()
-        log.info(f'Update {len(fields)} fields')
-        for irow, field in enumerate(fields):
-            self.addField(irow+1, field)
+        log.info(f'Update {len(rows_data)} fields')
+        for irow, row_data in enumerate(rows_data):
+            self.addField(irow+1, row_data, vc)
         pass
     
     def buildHeadings(self):
@@ -79,5 +80,7 @@ class PropsTable(tk.Frame):
     def clear(self):
         for row in self.rows:
             row.destroy()
+        for w in self.winfo_children():
+            w.destroy()
         self.rows = []
     
