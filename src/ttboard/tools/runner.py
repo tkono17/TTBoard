@@ -51,7 +51,7 @@ class Command:
         else:
             log.warning(f'  The application does not have a command {self.name}')
             
-class MacroRunner:
+class AppRunner:
     def __init__(self, app):
         self.app = app
         self.macroPath = None

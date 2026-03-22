@@ -1,6 +1,6 @@
 import typer
 import logging
-from ..tools import MacroRunner
+from ..tools import AppRunner
 from ..app import App
 
 log = logging.getLogger(__name__)
@@ -11,7 +11,7 @@ app = typer.Typer()
 def runMacro(macro_file: str):
     log.info(f'Run macro from {macro_file}')
     tbapp = App()
-    runner = MacroRunner(tbapp)
+    runner = AppRunner(tbapp)
     runner.run(macro_file)
     
 def main():
