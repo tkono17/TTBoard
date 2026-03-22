@@ -2,8 +2,10 @@ import os, sys
 import json
 import jsonpath
 import importlib
+from dataclasses import fields
 import logging
 from ..model import AppModel
+from ..tools import mainType
 
 log = logging.getLogger(__name__)
 
@@ -37,9 +39,6 @@ class App:
             self.model.selectors = self.model.dataModule.getAllSelectors()
         pass
 
-    def findall(self, expr):
-        return jsonpath.findall(expr, self.model.document)
-    
     def loadModule(self, moduleName=None):
         m = None
         if moduleName is None and \
@@ -89,6 +88,9 @@ class App:
         fn = self.model.documentPath.replace('.json', '-tmp.json')
         self.saveJsonFile(fn)
         os.rename(fn, self.model.documentPath)
+
+    def selectCollection(self, colName):
+        self.model.listData.collection = colName
         
     def collectionName(self):
         return self.model.listData.collection
@@ -96,32 +98,80 @@ class App:
     def selectorNames(self):
         return list(map(lambda x: x.name, self.model.selectors))
 
-    def isListSimple(self):
+    def getList(self, selectorName, *args):
         ldata = self.model.listData
-        return ldata.isListSimple()
-
-    def listEntries(self):
-        return self.model.listData.entries
-    
-    def getList(self, selectorName, args):
-        listData = self.model.listData
-        
-        selectors1 = filter(lambda x: x.name == selectorName, self.model.selectors)
-        selectors1 = list(selectors1)
-        selector = selectors1[0] if len(selectors1)>0 else None
-        
-        nargs = selector.jsonPath.count(r'[%s]')
-        if (args is None and nargs == 0) or (args is not None and len(args) == nargs):
-            v = selector.query(self.model.document, *args)
-            self.listMatches = [ x for x in v ]
-            listData.currentList = selector.findall(self.model.document, *args)
-            self.listElementType = selector.elementType
+        selector = self.findSelector(selectorName)
+        v = selector.query(self.model.document, *args)
+        if v is None:
+            ldata.jsonPath = None
+            ldata.jsonMatches = None
+            ldata.entries = None
+            ldata.elementType = None
         else:
-            listData.currentList = None
-            self.listElementType = None
-            self.listMatches = None
-        return listData.currentList
+            ldata.jsonPath = selector.expr(selector.jsonPath, *args)
+            ldata.jsonMatches = [ x for x in v ]
+            ldata.entries = selector.findall(self.model.document, *args)
+            ldata.elementType = selector.elementType
+        return ldata.entries
 
+    def showList(self):
+        ldata = self.model.listData
+        n = len(ldata.entries)
+        log.info(f'List of {ldata.collection} (x{n})')
+        for i, entry in enumerate(ldata.entries):
+            log.info(f'  [{i}] {entry}')
+
+    def getItem(self, selectorName, *args):
+        fdata = self.model.fieldsData
+        selector = self.findSelector(selectorName)
+        v = selector.query(self.model.document, *args)
+        if v is None:
+            pass
+        else:
+            v = list(v)
+            expr = selector.expr(selector.jsonPath, *args)
+            if len(v) == 0:
+                log.warning(f'  No item was found for {expr}')
+            elif len(v) > 1:
+                log.warning(f'  More than one items were found for {expr}')
+            else:
+                jmatch = v[0]
+                entry = selector.findall(self.model.document, *args)[0]
+                fdata.elementPath = jmatch.path
+                fdata.containerPath = jmatch.parent.path
+                fdata.elementKey = None
+                fdata.elementMatch = jmatch
+                fdata.containerMatch = jmatch.parent
+                fdata.elementType = selector.elementType
+                if fdata.isEntrySimple():
+                    fdata.fields = { 'Value': entry }
+                else:
+                    fdata.fields = entry
+                log.info(f'  fdata={fdata}')
+        
+    def showItem(self):
+        fdata = self.model.fieldsData
+        log.info(f'Item fields {fdata.elementPath}')
+        for key, value in fdata.fields.items():
+            log.info(f'  [{key}] {value}')
+
+    def enableField(self, fieldName):
+        fdata = self.model.fieldsData
+        epath = fdata.elementPath
+        if fdata.isEntrySimple():
+            log.warning(f'  Cannot enable a field for a simple item')
+        else:
+            pointer = fdata.elementMatch.pointer()
+            obj = pointer.resolve(self.model.document)
+            if fieldName in obj.keys():
+                return
+            f1 = fields(fdata.elementType)
+            f2 = list(filter(lambda x: x.name == fieldName, f1))
+            if len(f2) == 1:
+                ftype = mainType(f2[0])
+                obj[fieldName] = ftype()
+        self.save()
+            
     def findSelector(self, sname):
         selector = None
         v = list(filter(lambda x: x.name == sname, self.model.selectors))

@@ -68,7 +68,14 @@ class FieldsData:
         self.containerMatch = ldata.jsonMatches[ientry].parent
         self.fields = obj
         self.elementType = ldata.elementType
-        
+
+    def itemKey(self):
+        key1 = self.elementPath.replace(self.containerPath, '')
+        key = key1[1:-1]
+        if key[0] not in ("'", '"'):
+            key = int(key)
+        return key
+    
 @dataclass
 class AppModel:
     name: str

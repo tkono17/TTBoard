@@ -5,6 +5,7 @@ from tkinter import filedialog
 import jsonpath
 import logging
 import re
+from ..tools import mainType
 from .tableManager import TableManager, FieldsManager
 from .vmodel import ViewModel, FieldState, FieldRow
 
@@ -63,10 +64,8 @@ class ViewControl:
             entries = tableMgr.getEntries()
             for values, image in entries:
                 if image is not None:
-                    log.info('Insert with image')
                     table.insert('', 'end', image=image, values=values)
                 else:
-                    log.info('Insert just values')
                     table.insert('', 'end', values=values)
         pass
     
@@ -82,7 +81,7 @@ class ViewControl:
         lview = self.vmodel.listView
         ldata = self.app.model.listData
 
-        if self.app.isListSimple():
+        if ldata.isListSimple():
             lview.fieldStates = [ FieldState('Value', True) ]
         else:
             lview.fieldStates = [
@@ -92,10 +91,9 @@ class ViewControl:
         columnsEn = [ x.name for x in filter(lambda y: y.isActive, lview.fieldStates)]
         if lview.displayStyle == 'table':
             allColumns = list(map(lambda x: x.name, lview.fieldStates))
-            entries = self.app.listEntries()
-            if self.app.isListSimple():
+            entries = ldata.entries
+            if ldata.isListSimple():
                 entries = [ { 'Value': x } for x in ldata.entries ]
-            log.info(f'Updating simple list in table: {entries}')
             self.listTableMgr = TableManager(columnsEn,
                                              entries,
                                              allColumns=allColumns,
@@ -105,24 +103,27 @@ class ViewControl:
             self.updateBoardEntries(tree, entries, columnsEn)
 
     def selectObject(self):
+        ldata = self.app.model.listData
         fdata = self.app.model.fieldsData
-        lview = self.vmodel.listView
         fview = self.vmodel.fieldView
 
         obj = fdata.fields
         keys = obj.keys()
         rows = []
-        for fs in lview.fieldStates:
-            included, value = False, ''
-            vtype = None
-            if fs.name in keys:
-                included = True
-                value = obj[fs.name]
-                vtype = type(value)
-            frow = FieldRow(included, fs.name,
-                            tk.StringVar(value=str(value)),
-                            vtype)
-            rows.append(frow)
+        fieldNames = []
+        if ldata.isListSimple():
+            row = FieldRow(True, 'Value', obj['Value'], str)
+            rows.append(row)
+        else:
+            for field in fields(ldata.elementType):
+                included, value = False, ''
+                vtype = mainType(field)
+                if field.name in keys:
+                    included = True
+                    value = obj[field.name]
+                row = FieldRow(included, field.name,
+                               tk.StringVar(value=str(value)), vtype)
+                rows.append(row)
         fview.rows = rows
         log.info(f'  fview = {fview}, rows={fview.rows}')
         
@@ -169,13 +170,6 @@ class ViewControl:
         args = re.findall(r'\[(.*?)\]', lview.jsonPath.get())
         v = self.app.getList(lview.collection.get(), args)
         selector = self.app.findSelector(lview.collection.get())
-        if v is None:
-            ldata.entries = []
-            ldata.jsonMatches = None
-        else:
-            ldata.entries = v
-            ldata.jsonMatches = self.app.listMatches
-            log.info(f'  Matches: {ldata.jsonMatches}')
         if selector:
             cls = selector.elementType
             ldata.elementType = cls
@@ -203,7 +197,7 @@ class ViewControl:
             if len(rows) == 1:
                 irow = tree.index(rows[0])
                 entry = ldata.entries[irow]
-                if self.app.isListSimple():
+                if ldata.isListSimple():
                     obj = { 'Value': str(entry) }
                 else:
                     obj = entry
@@ -322,11 +316,13 @@ class ViewControl:
             if fview.state == 'New':
                 for row in fview.rows:
                     if row.isActive:
-                        cont[row.name] = row.value.get()
+                        cont[row.name] = row.getValue()
             else:
                 for row in fview.rows:
                     if row.isActive:
-                        cont[row.name] = row.value.get()
+                        value = row.getValue()
+                        log.info(f'  value of {row.name} is {value}, T={row.valueType}')
+                        cont[row.name] = value
                     elif row.name in cont.keys():
                         cont.pop(row.name)
             modified = True
