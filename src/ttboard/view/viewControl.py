@@ -105,19 +105,23 @@ class ViewControl:
             self.updateBoardEntries(tree, entries, columnsEn)
 
     def selectObject(self):
-        ldata = self.app.model.listData
+        fdata = self.app.model.fieldsData
         lview = self.vmodel.listView
         fview = self.vmodel.fieldView
 
-        obj = ldata.entry
+        obj = fdata.fields
         keys = obj.keys()
         rows = []
         for fs in lview.fieldStates:
             included, value = False, ''
+            vtype = None
             if fs.name in keys:
                 included = True
                 value = obj[fs.name]
-            frow = FieldRow(included, fs.name, tk.StringVar(value=str(value)))
+                vtype = type(value)
+            frow = FieldRow(included, fs.name,
+                            tk.StringVar(value=str(value)),
+                            vtype)
             rows.append(frow)
         fview.rows = rows
         log.info(f'  fview = {fview}, rows={fview.rows}')
@@ -189,6 +193,7 @@ class ViewControl:
 
     def onEntrySelected(self, event):
         ldata = self.app.model.listData
+        fdata = self.app.model.fieldsData
         fview = self.vmodel.fieldView
         
         log.info(f'Entry selected in {event.widget}')
@@ -197,18 +202,18 @@ class ViewControl:
             rows = tree.selection()
             if len(rows) == 1:
                 irow = tree.index(rows[0])
-                jmatch = ldata.jsonMatches[irow]
                 entry = ldata.entries[irow]
-                containerPath = ldata.containerPath(irow)
-                pobj = {}
                 if self.app.isListSimple():
                     obj = { 'Value': str(entry) }
                 else:
                     obj = entry
-                fview.containerPath.set(containerPath)
-                fview.key = None
-                fview.state = 'Set'
-                ldata.entry = obj
+                fdata.update(ldata, irow, obj)
+                if ldata.isListSimple():
+                    fview.containerPath.set(fdata.containerPath)
+                else:
+                    fview.containerPath.set(fdata.elementPath)
+                fview.key = irow
+                fview.setState('Set')
                 self.selectObject()
                 self.updateObject()
 
@@ -223,6 +228,7 @@ class ViewControl:
 
     def onNewEntry(self):
         ldata = self.app.model.listData
+        fdata = self.app.model.fieldsData
         lview = self.vmodel.listView
         fview = self.vmodel.fieldView
         
@@ -240,12 +246,18 @@ class ViewControl:
             obj = { '[]': '[]' }
             cpath = ldata.containerPath()
         else:
-            obj = { '[]': ''}
+            obj = { 'Value': ''}
             cpath = ldata.containerPath()
+        fdata.containerPath = cpath
+        fdata.jsonMatch = None
+        fdata.parentMatch = None
+        fdata.fields = obj
+        fdata.elementType = ldata.elementType
+
         fview.containerPath.set(cpath)
         fview.key = None
         ldata.entry = obj
-        fview.state = 'New'
+        fview.setState('New')
         self.selectObject()
         self.updateObject()
         
@@ -255,41 +267,69 @@ class ViewControl:
     def onFieldChanged(self, *args):
         log.info(f'Field changed')
         fview = self.vmodel.fieldView
-        fview.state = 'Modified'
+        fview.setState('Modified')
         
     def onSaveFields(self, event):
         fview = self.vmodel.fieldView
         fdata = self.app.model.fieldsData
 
-        log.info(f'Save object')
+        log.info(f'Save object state={fview.state}')
         cpath = fview.containerPath.get()
         modified = False
-        matches = jsonpath.query(cpath, self.app.model.document)
         cont = None
-        if matches is not None:
-            matches = list(matches)
-            jpointer = matches[0].pointer()
-            cont = jpointer.resolve(self.app.model.document)
-        if fview.state == 'New':
-            if fdata.isEntrySimple():
-                value = fview.rows[0].value.get()
+
+        if fdata.isEntrySimple():
+            cpath = fdata.containerPath
+            cmatch = fdata.containerMatch
+            if cmatch is None:
+                cmatches = jsonpath.query(cpath, self.app.model.document)
+                if cmatches is not None and len(cmatches)>0:
+                    cmatch = cmatches[0]
+                    jpointer = cmatch.pointer()
+                    cont = jpointer.resolve(self.app.model.document)
+                else:
+                    log.warning(f'Cannot identify container of {cpath}')
+                    return
+            else:
+                jpointer = cmatch.pointer()
+                cont = jpointer.resolve(self.app.model.document)
+            if fview.state == 'New':
+                value = fview.rows[0].getValue()
                 cont.append(value)
             else:
+                log.info(f'Write {cpath} key={fview.key}, cont={cont}')
+                cont[fview.key] = fview.rows[0].getValue()
+            pass
+        else:
+            cpath = fdata.elementPath
+            cmatch = fdata.elementMatch
+            if cmatch is None:
+                cpath = fdata.containerPath
+                cmatches = jsonpath.query(cpath, self.app.model.document)
+                for cmatch in cmatches:
+                    jpointer = cmatch.pointer()
+                    cont2 = jpointer.resolve(self.app.model.document)
+                    cont = {}
+                    cont2.append(cont)
+                    break
+                if cont is None:
+                    log.warning(f'Cannot identify container of {cpath}')
+                    return
+            else:
+                jpointer = cmatch.pointer()
+                cont = jpointer.resolve(self.app.model.document)
+            log.info(f'Got container: {cont}')
+            if fview.state == 'New':
                 for row in fview.rows:
-                    cont[row.name] = row.value.get()
-            modified = True
-        elif fview.state == 'Modified':
-            if fdata.isEntrySimple():
-                value = fview.rows[0].value
-                if fview.key is not None:
-                    cont[fview.key] = value.get()
-                else:
-                    log.warning(f'Key is null for simple value in a list {fview.cpath}')
+                    if row.isActive:
+                        cont[row.name] = row.value.get()
             else:
                 for row in fview.rows:
-                    cont[row.name] = row.value.get()
+                    if row.isActive:
+                        cont[row.name] = row.value.get()
+                    elif row.name in cont.keys():
+                        cont.pop(row.name)
             modified = True
         modified = True
         if modified:
-            fn = self.app.model.documentPath+'.tmp'
-            self.app.saveJsonFile(fn)
+            self.app.save()

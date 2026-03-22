@@ -10,6 +10,7 @@ class ListData:
     jsonMatches: list[jsonpath.JSONPathMatch] | None = None
     entries: list[Any] | None = None
     elementType: int | float | str | list[Any] | dict[str,Any] | None = None
+    key: int | str | None = None
 
     def allFields(self):
         if self.elementType in (int, float, str):
@@ -20,43 +21,54 @@ class ListData:
         
     def isListSimple(self):
         return self.elementType in (int, float, str)
-    
-    def containerPath(self, ientry=None):
-        cpath = None
-        if ientry is not None: # List entry selected
-            jmatch = self.jsonMatches[ientry]
-            containerPath = jmatch.path
-            if self.isListSimple():
-                containerPath = jmatch.parent.path
-        elif self.isListSimple(): # scalar in the list
-            jpath = self.jsonPath.get()
-            ip = jpath.rfind(r'[')
-            if ip > 0:
-                containerPath = jpath[0:ip]
-        elif len(self.jsonMatches)>0: # New entry
-            jpath = self.jsonMatches[0]
-            ip = jpath.rfind(r'[')
-            if ip > 0:
-                containerPath = jpath[0:ip] + '[]'
+
+    def elementPath(self, ientry=None):
+        epath = None
+        if self.jsonMatches is not None and len(self.jsonMatches)>0 and \
+           ientry is not None:
+            epath = self.jsonMatches[ientry].path
         else:
-            jpath = self.jsonPath.get()
-            ip = jpath.rfind(r'[')
-            if ip > 0:
-                containerPath = jpath[0:ip]              
-        return containerPath
-    
+            epath = None
+        return epath
+
+    def containerPath(self):
+        cpath = None
+        if self.jsonMatches is not None and len(self.jsonMatches)>0:
+            cpath = self.jsonMatches[0].parent.path
+        else:
+            re1 = re.compile(r'.*(\[.*?\])$')
+            mg = re1.search(self.jsonPath)
+            if mg is not None:
+                matched = mg.group(1)
+                ip = self.jsonPath.rfind(matched)
+                if ip > 0:
+                    cpath = self.jsonPath[0:ip]
+        return cpath
 
 @dataclass
 class FieldsData:
-    jsonPath: str | None = None
-    jsonMatch: list[jsonpath.JSONPathMatch] | None = None
-    parentMatch: list[jsonpath.JSONPathMatch] | None = None
-    fields: list[Any] | None = None
+    elementPath: str | None = None
+    containerPath: str | None = None
+    elementKey: int | str | None = None
+    elementMatch: list[jsonpath.JSONPathMatch] | None = None
+    containerMatch: list[jsonpath.JSONPathMatch] | None = None
+    fields: dict[str, Any] | None = None
     elementType: int | float | str | list[Any] | dict[str,Any] | None = None
     
     def isEntrySimple(self):
         return self.elementType in (int, float, str)
-    
+
+    def update(self, ldata: ListData,
+               ientry: int | None =None,
+               obj: Any = None):
+        self.elementPath = ldata.elementPath()
+        self.containerPath = ldata.containerPath()
+        self.elementKey = ientry
+        self.elementMatch = ldata.jsonMatches[ientry]
+        self.containerMatch = ldata.jsonMatches[ientry].parent
+        self.fields = obj
+        self.elementType = ldata.elementType
+        
 @dataclass
 class AppModel:
     name: str

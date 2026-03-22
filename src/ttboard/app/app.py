@@ -85,6 +85,11 @@ class App:
             log.warning(f'    Output directory = {dn}, document null? {dnull}')
         pass
 
+    def save(self):
+        fn = self.model.documentPath.replace('.json', '-tmp.json')
+        self.saveJsonFile(fn)
+        os.rename(fn, self.model.documentPath)
+        
     def collectionName(self):
         return self.model.listData.collection
     

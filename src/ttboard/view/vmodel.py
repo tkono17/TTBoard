@@ -27,7 +27,15 @@ class FieldRow:
     isActive: bool = True
     name: str | None = None
     value: tk.StringVar | None = field(default_factory=tk.StringVar)
-    
+    valueType: int | str | float | list | dict | Any | None = None
+
+    def getValue(self):
+        svalue = self.value.get()
+        if self.valueType is not None:
+            return self.valueType(svalue)
+        else:
+            return svalue
+            
 @dataclass
 class FieldViewModel:
     containerPath: tk.StringVar = field(default_factory=tk.StringVar)
@@ -36,6 +44,12 @@ class FieldViewModel:
     state: str | None = None
     useIncludeButton: bool = True
 
+    def setState(self, newState):
+        if newState == 'Modified' and self.state == 'New':
+            pass
+        else:
+            self.state = newState
+            
     def orderedFields(self):
         rows1 = list(filter(lambda x: x.isActive, self.rows))
         rows0 = list(filter(lambda x: not x.isActive, self.rows))
