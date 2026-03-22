@@ -23,8 +23,11 @@ class App:
         self.model.listData.entires = None
         self.model.listData.elementType = None
         
-        self.model.fieldsData.jsonPath = None
-        self.model.fieldsData.jsonMatch = None
+        self.model.fieldsData.elementPath = None
+        self.model.fieldsData.containerPath = None
+        self.model.fieldsData.elementMatch = None
+        self.model.fieldsData.containerMatch = None
+        self.model.fieldsData.key = None
         self.model.fieldsData.fields = None
         self.model.fieldsData.elementType = None
 
@@ -121,6 +124,18 @@ class App:
         for i, entry in enumerate(ldata.entries):
             log.info(f'  [{i}] {entry}')
 
+    def addItem(self, *keyValues):
+        log.warning(f'addItem to list not implemented yet')
+        
+    def addValue(self, *keyValues):
+        log.warning(f'addValue to list not implemented yet')
+
+    def deleteItem(self, selectorName, *args):
+        log.warning(f'deleteItem to list not implemented yet')
+        
+    def deleteValue(self, selectorName, *args):
+        log.warning(f'deleteValue to list not implemented yet')
+
     def getItem(self, selectorName, *args):
         fdata = self.model.fieldsData
         selector = self.findSelector(selectorName)
@@ -155,7 +170,7 @@ class App:
         for key, value in fdata.fields.items():
             log.info(f'  [{key}] {value}')
 
-    def enableField(self, fieldName):
+    def enableField(self, *fieldNames):
         fdata = self.model.fieldsData
         epath = fdata.elementPath
         if fdata.isEntrySimple():
@@ -163,13 +178,33 @@ class App:
         else:
             pointer = fdata.elementMatch.pointer()
             obj = pointer.resolve(self.model.document)
-            if fieldName in obj.keys():
-                return
             f1 = fields(fdata.elementType)
-            f2 = list(filter(lambda x: x.name == fieldName, f1))
-            if len(f2) == 1:
-                ftype = mainType(f2[0])
-                obj[fieldName] = ftype()
+            names = list(map(lambda x: x.name, f1))
+            for fieldName in fieldNames:
+                if fieldName in names:
+                    if fieldName in obj.keys(): continue
+                    f2 = list(filter(lambda x: x.name == fieldName, f1))
+                    if len(f2) == 1:
+                        ftype = mainType(f2[0])
+                        obj[fieldName] = ftype()
+                else:
+                    log.warning(f'  field {fieldName} is not valid')
+                    continue
+        self.save()
+            
+    def disableField(self, *fieldNames):
+        fdata = self.model.fieldsData
+        epath = fdata.elementPath
+        if fdata.isEntrySimple():
+            log.warning(f'  Cannot enable a field for a simple item')
+        else:
+            pointer = fdata.elementMatch.pointer()
+            obj = pointer.resolve(self.model.document)
+            f1 = fields(fdata.elementType)
+            names = list(map(lambda x: x.name, f1))
+            for fieldName in fieldNames:
+                if fieldName in obj.keys():
+                    obj.pop(fieldName)
         self.save()
             
     def findSelector(self, sname):
@@ -179,7 +214,29 @@ class App:
             selector = v[0]
         return selector
 
-    def setFieldValue(self, jpath, value):
+    def setFieldValue(self, fieldName, value):
+        fdata = self.model.fieldsData
+        fdata = self.model.fieldsData
+        if fdata.isEntrySimple():
+            log.warning(f'  Cannot set field value for a simple type')
+        else:
+            pointer = fdata.elementMatch.pointer()
+            obj = pointer.resolve(self.model.document)
+            obj[fieldName] = value
+        self.save()
+
+    def setItemValue(self, value):
+        fdata = self.model.fieldsData
+        if fdata.isEntrySimple():
+            pointer = fdata.containerMatch.pointer()
+            v = pointer.resolve(self.model.document)
+            key = fdata.itemKey()
+            v[key] = value
+        else:
+            log.warning(f'  Current item is not of a simple type')
+        self.save()
+
+    def setFieldValue1(self, jpath, value):
         matches = jsonpath.query(jpath, self.model.document)
         matches = list(matches)
         match len(matches):

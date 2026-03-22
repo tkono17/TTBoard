@@ -56,7 +56,14 @@ class AppRunner:
         self.app = app
         self.macroPath = None
         self.commands = []
-        
+
+    def allCommands(self):
+        names = dir(self.app)
+        mtype = type(self.app.__init__)
+        fnames = filter(lambda x: not x.startswith('_'), names)
+        fnames = filter(lambda x: type(getattr(self.app, x)) == mtype, fnames)
+        return fnames
+
     def run(self, macroFile: str):
         self.macroPath = macroFile
         self.commands = self.openMacro()
