@@ -21,6 +21,8 @@ class JsonSelector:
             expr = self.expr(self.jsonPath, *args1)
         else:
             return None
+        log.info(f'  args = {args}')
+        log.info(f'  expr = {expr}')
         x = jsonpath.query(expr, document)
         return x
     

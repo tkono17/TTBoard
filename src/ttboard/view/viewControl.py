@@ -168,7 +168,7 @@ class ViewControl:
         ldata = self.app.model.listData
         
         args = re.findall(r'\[(.*?)\]', lview.jsonPath.get())
-        v = self.app.getList(lview.collection.get(), args)
+        v = self.app.getList(lview.collection.get(), *args)
         selector = self.app.findSelector(lview.collection.get())
         if selector:
             cls = selector.elementType

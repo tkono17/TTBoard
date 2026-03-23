@@ -66,7 +66,7 @@ class App:
 
     def openJsonFile(self, fpath):
         if os.path.exists(fpath):
-            with open(fpath, 'r') as fin:
+            with open(fpath, 'r', encoding='utf8') as fin:
                 self.model.documentPath = fpath
                 self.model.document = json.load(fin)
             self.loadModule()
