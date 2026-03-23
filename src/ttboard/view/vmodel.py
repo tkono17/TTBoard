@@ -1,6 +1,7 @@
 from typing import Optional, Any
 from dataclasses import dataclass, field
 import tkinter as tk
+from tkinter import ttk
 import jsonpath
 
 @dataclass
@@ -26,19 +27,22 @@ class ListViewModel:
 class FieldRow:
     isActive: bool = True
     name: str | None = None
-    value: tk.StringVar | None = field(default_factory=tk.StringVar)
+    value: tk.StringVar | list[Any] | dict[str,Any] | None = None
     valueType: int | str | float | list | dict | Any | None = None
 
     def getValue(self):
-        svalue = self.value.get()
-        if self.valueType is not None:
-            return self.valueType(svalue)
-        else:
-            return svalue
+        value = None
+        tvalue = type(self.value)
+        if tvalue == tk.StringVar:
+            svalue = self.value.get()
+            value = self.valueType(svalue)
+        elif tvalue in (list, dict):
+            value = self.value
+        return value
             
 @dataclass
 class FieldViewModel:
-    containerPath: tk.StringVar = field(default_factory=tk.StringVar)
+    elementPath: tk.StringVar = field(default_factory=tk.StringVar)
     key: str | int | None = None
     rows: list[FieldRow] | None = field(default_factory=list)
     state: str | None = None

@@ -5,7 +5,7 @@ import importlib
 from dataclasses import fields
 import logging
 from ..model import AppModel
-from ..tools import mainType
+from ..tools import mainType, readKeyValue
 
 log = logging.getLogger(__name__)
 
@@ -88,9 +88,16 @@ class App:
         pass
 
     def save(self):
-        fn = self.model.documentPath.replace('.json', '-tmp.json')
-        self.saveJsonFile(fn)
-        os.rename(fn, self.model.documentPath)
+        fn1 = self.model.documentPath.replace('.json', '-tmp.json')
+        fn2 = self.model.documentPath.replace('.json', '-backup.json')
+        if os.path.exists(fn1):
+            os.remove(fn1)
+        self.saveJsonFile(fn1)
+        if os.path.exists(fn2):
+            os.remove(fn2)
+        if os.path.exists(self.model.documentPath):
+            os.rename(self.model.documentPath, fn2)
+        os.rename(fn1, self.model.documentPath)
 
     def selectCollection(self, colName):
         self.model.listData.collection = colName
@@ -103,6 +110,7 @@ class App:
 
     def getList(self, selectorName, *args):
         ldata = self.model.listData
+        ldata.collection = selectorName
         selector = self.findSelector(selectorName)
         v = selector.query(self.model.document, *args)
         if v is None:
@@ -117,6 +125,10 @@ class App:
             ldata.elementType = selector.elementType
         return ldata.entries
 
+    def findall(self, jpath):
+        entries = jsonpath.findall(jpath, self.model.document)
+        return entries
+    
     def showList(self):
         ldata = self.model.listData
         n = len(ldata.entries)
@@ -125,8 +137,52 @@ class App:
             log.info(f'  [{i}] {entry}')
 
     def addItem(self, *keyValues):
-        log.warning(f'addItem to list not implemented yet')
-        
+        log.warning(f'addItem {keyValues}')
+        ldata = self.model.listData
+        fdata = self.model.fieldsData
+
+        obj = {}
+        cpath = ldata.jsonPath
+        ip = cpath.rfind('[')
+        if ip > 0:
+            cpath = cpath[0:ip]
+        log.info(f'  get container {cpath}')
+        matches = list(jsonpath.query(cpath, self.model.document))
+        if len(matches)==1:
+            cmatch = matches[0]
+            pointer = cmatch.pointer()
+            cont = pointer.resolve(self.model.document)
+
+            fdata.elementPath = None
+            fdata.containerPath = cmatch.path
+            fdata.elementKey = None
+            fdata.elementMatch = None
+            fdata.containerMatch = cmatch
+            fdata.elementType = ldata.elementType
+
+        for kv in keyValues:
+            k, v = readKeyValue(kv)
+            if k is not None:
+                obj[k] = v
+
+        if cont is not None:
+            log.info(f'  add object to the list (x{len(cont)})')
+            cont.append(obj)
+
+            ekey = len(cont) - 1
+            epath = cpath + f'[{ekey}]'
+            log.info(f'  New item path {epath}')
+            matches = list(jsonpath.query(epath, self.model.document))
+            fdata.elementPath = epath
+            fdata.elementKey = ekey
+            if len(matches)==1:
+                ematch = matches[0]
+                ldata.jsonMatches.append(ematch)
+                ldata.entries.append(obj)
+                fdata.elementMatch = None
+            fdata.fields = obj
+
+
     def addValue(self, *keyValues):
         log.warning(f'addValue to list not implemented yet')
 

@@ -21,18 +21,22 @@ class PropsTable(tk.Frame):
         w = None
         bgcolor = 'white smoke'
         tvalue = type(var)
-        log.info(f'value for props is {tvalue}')
-        if tvalue == tk.StringVar:
+        if var is None:
+            w = tk.Entry(self)
+        elif tvalue == tk.StringVar:
             w = tk.Entry(self, textvariable=var, bg=bgcolor)
             var.trace_add('write', vc.onFieldChanged)
         elif tvalue == list:
             w = ttk.Button(self, text='Show list', style='objOn.TButton')
         elif tvalue == dict:
-            w = ttk.Button(self, text='Open object', style='objOn.TButton')
+            w = ttk.Button(self, text='Show object', style='objOn.TButton')
+        else:
+            log.warning(f'  Unexpected variable type in the row entry {tvalue}')
+            w = tk.Entry(self)
         return w
     
     def addField(self, irow, row_data, vc):
-        log.info(f'addField {row_data}')
+        #log.info(f'addField {row_data}')
         bgcolor = 'white smoke'
         included, key, value = row_data.isActive, row_data.name, row_data.value
         image = None
@@ -57,7 +61,7 @@ class PropsTable(tk.Frame):
             
     def updateFields(self, rows_data, vc):
         self.clear()
-        log.info(f'Update {len(rows_data)} fields')
+        #log.info(f'Update {len(rows_data)} fields')
         for irow, row_data in enumerate(rows_data):
             self.addField(irow+1, row_data, vc)
         pass

@@ -38,7 +38,7 @@ class PathRow(tk.Frame):
         fview = vc.vmodel.fieldView
         
         jpathLabel = tk.Label(self, text='JSONPath: ')
-        jpathText = tk.Entry(self, textvariable=fview.containerPath)
+        jpathText = tk.Entry(self, textvariable=fview.elementPath)
 
         vc.addWidget('objJpathText', jpathText)
 

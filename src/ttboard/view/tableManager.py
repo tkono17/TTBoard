@@ -56,6 +56,7 @@ class TableManager:
 class FieldsManager:
     def __init__(self, fieldsViewModel):
         self.model = fieldsViewModel
+        #for field in self.model.fields:
 
     def useIncludButton(self):
         return self.model.useIncludeButton

@@ -2,6 +2,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Optional, Any
 import logging
+from .field import readScalar
 
 log = logging.getLogger(__name__)
 
@@ -25,18 +26,7 @@ class Command:
             self.args.append(arg)
 
     def readArg(self, word):
-        value = None
-        try:
-            value = int(word)
-        except ValueError as e:
-            pass
-        if value is None:
-            try:
-                value = float(word)
-            except ValueError as e:
-                pass
-        if value is None:
-            value = word
+        value = readScalar(word)
         return value
 
     def isValid(self):
@@ -47,6 +37,8 @@ class Command:
             func = getattr(app, self.name)
             if func is not None:
                 log.info(f'  Running command {self.name}')
+                for iarg, arg in enumerate(self.args):
+                    log.info(f'    args[{iarg}]: {arg}')
                 func(*self.args)
         else:
             log.warning(f'  The application does not have a command {self.name}')
@@ -74,7 +66,7 @@ class AppRunner:
     def openMacro(self):
         self.commands = []
         if os.path.exists(self.macroPath):
-            with open(self.macroPath, 'r') as fin:
+            with open(self.macroPath, 'r', encoding='utf8') as fin:
                 for line in fin.readlines():
                     if len(line)==0 or line[0]=='#': continue
                     if line[-1] == os.linesep: line = line[:-1]

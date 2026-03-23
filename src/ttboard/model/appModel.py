@@ -61,7 +61,7 @@ class FieldsData:
     def update(self, ldata: ListData,
                ientry: int | None =None,
                obj: Any = None):
-        self.elementPath = ldata.elementPath()
+        self.elementPath = ldata.elementPath(ientry)
         self.containerPath = ldata.containerPath()
         self.elementKey = ientry
         self.elementMatch = ldata.jsonMatches[ientry]

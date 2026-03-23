@@ -72,8 +72,8 @@ class ViewControl:
     def updateFieldEntries(self, table, fieldMgr):
         fview = self.vmodel.fieldView
         fview.updateRows()
-        log.info(f'  updated fields: {fview.orderedFields()}')
-        log.info(f'  updated rows: {fieldMgr.model.rows}')
+        #log.info(f'  updated fields: {fview.orderedFields()}')
+        #log.info(f'  updated rows: {fieldMgr.model.rows}')
         table.updateFields(fieldMgr.rows(), self)
         pass
     
@@ -107,22 +107,29 @@ class ViewControl:
         fdata = self.app.model.fieldsData
         fview = self.vmodel.fieldView
 
+        fview.elementPath.set(fdata.elementPath)
+        log.info(f'Select object at {fview.elementPath.get()}')
         obj = fdata.fields
         keys = obj.keys()
         rows = []
         fieldNames = []
         if ldata.isListSimple():
-            row = FieldRow(True, 'Value', obj['Value'], str)
+            valueField = tk.StringVar(value=obj['Value'])
+            row = FieldRow(True, 'Value', valueField, str)
             rows.append(row)
         else:
             for field in fields(ldata.elementType):
                 included, value = False, ''
                 vtype = mainType(field)
+                valueField = None
                 if field.name in keys:
                     included = True
                     value = obj[field.name]
-                row = FieldRow(included, field.name,
-                               tk.StringVar(value=str(value)), vtype)
+                    if type(value) in (list, dict):
+                        valueField = value
+                    else:
+                        valueField = tk.StringVar(value=value)
+                row = FieldRow(included, field.name, valueField, vtype)
                 rows.append(row)
         fview.rows = rows
         log.info(f'  fview = {fview}, rows={fview.rows}')
@@ -202,10 +209,7 @@ class ViewControl:
                 else:
                     obj = entry
                 fdata.update(ldata, irow, obj)
-                if ldata.isListSimple():
-                    fview.containerPath.set(fdata.containerPath)
-                else:
-                    fview.containerPath.set(fdata.elementPath)
+                fview.elementPath.set(fdata.elementPath)
                 fview.key = irow
                 fview.setState('Set')
                 self.selectObject()
@@ -248,7 +252,7 @@ class ViewControl:
         fdata.fields = obj
         fdata.elementType = ldata.elementType
 
-        fview.containerPath.set(cpath)
+        fview.elementPath.set(cpath)
         fview.key = None
         ldata.entry = obj
         fview.setState('New')
@@ -268,7 +272,7 @@ class ViewControl:
         fdata = self.app.model.fieldsData
 
         log.info(f'Save object state={fview.state}')
-        cpath = fview.containerPath.get()
+        cpath = fview.elementPath.get()
         modified = False
         cont = None
 
