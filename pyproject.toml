@@ -8,7 +8,9 @@ dependencies = [
   "typer",
   "python-jsonpath",
   "pillow",
-  "pytest"
+  "pytest",
+  "build",
+  "twine"
   ]
 
 [project.scripts]
