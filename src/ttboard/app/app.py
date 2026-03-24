@@ -1,4 +1,5 @@
 import os, sys
+import re
 import json
 import jsonpath
 import importlib
@@ -137,7 +138,7 @@ class App:
             log.info(f'  [{i}] {entry}')
 
     def addItem(self, *keyValues):
-        log.warning(f'addItem {keyValues}')
+        log.info(f'addItem {keyValues}')
         ldata = self.model.listData
         fdata = self.model.fieldsData
 
@@ -183,14 +184,70 @@ class App:
             fdata.fields = obj
 
 
-    def addValue(self, *keyValues):
-        log.warning(f'addValue to list not implemented yet')
+    def addValue(self, value):
+        log.info(f'addItem {value}')
+        ldata = self.model.listData
+        fdata = self.model.fieldsData
+
+        value = ldata.elementType(value)
+
+        cpath = ldata.jsonPath
+        ip = cpath.rfind('[')
+        if ip > 0:
+            cpath = cpath[0:ip]
+        log.info(f'  get container {cpath}')
+        matches = list(jsonpath.query(cpath, self.model.document))
+        if len(matches)==1:
+            cmatch = matches[0]
+            pointer = cmatch.pointer()
+            cont = pointer.resolve(self.model.document)
+
+            fdata.elementPath = None
+            fdata.containerPath = cmatch.path
+            fdata.elementKey = None
+            fdata.elementMatch = None
+            fdata.containerMatch = cmatch
+            fdata.elementType = ldata.elementType
+
+        if cont is not None:
+            log.info(f'  add value to the list (x{len(cont)})')
+            cont.append(value)
+
+            ekey = len(cont) - 1
+            epath = cpath + f'[{ekey}]'
+            log.info(f'  New item path {epath}')
+            matches = list(jsonpath.query(epath, self.model.document))
+            fdata.elementPath = epath
+            fdata.elementKey = ekey
+            if len(matches)==1:
+                ematch = matches[0]
+                ldata.jsonMatches.append(ematch)
+                ldata.entries.append(value)
+                fdata.elementMatch = None
+            fdata.fields = { 'Value': value}
 
     def deleteItem(self, selectorName, *args):
-        log.warning(f'deleteItem to list not implemented yet')
-        
-    def deleteValue(self, selectorName, *args):
-        log.warning(f'deleteValue to list not implemented yet')
+        log.info(f'deleteItem')
+        ldata = self.model.listData
+        cont, key = None, None
+
+        selector = self.findSelector(selectorName)
+        matches = list(selector.query(self.model.document, *args))
+        if len(matches)>0:
+            match0 = matches[0]
+            pointer = match0.pointer()
+            cont, _ = pointer.resolve_parent(self.model.document)
+            mg = re.search(r'.*\[(.*?)\]$', match0.path)
+            if mg:
+                key = int(mg.group(1))
+            if key >= 0 and key < len(cont):
+                del cont[key]
+                del ldata.jsonMatches[key]
+                del ldata.entries[key]
+            else:
+                log.warning(f'  key={key} is out-of-range {key>=0} {key<len(cont)}')
+        else:
+            log.warning(f'  found no matches')
 
     def getItem(self, selectorName, *args):
         fdata = self.model.fieldsData
