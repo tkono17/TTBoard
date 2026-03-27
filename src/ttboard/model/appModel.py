@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field, fields
 from typing import Optional, Any
 import jsonpath
+import re
 from ..tools import JsonSelector
 
 @dataclass

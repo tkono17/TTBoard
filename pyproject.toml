@@ -1,6 +1,6 @@
 [project]
 name = "TTBoard"
-version = "0.0.1"
+version = "v0.0.2"
 description = "GUI application to edit database and JSON files"
 readme = "README.md"
 
