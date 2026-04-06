@@ -3,10 +3,11 @@ import re
 import json
 import jsonpath
 import importlib
-from dataclasses import fields
+from dataclasses import fields, asdict
 import logging
 from ..model import AppModel
-from ..tools import mainType, readKeyValue
+from ..tools import mainType, readKeyValue, readScalar
+from .managers import ListMgr, createItemMgr, ScalarItemMgr, ListItemMgr, ObjectItemMgr
 
 log = logging.getLogger(__name__)
 
@@ -24,13 +25,16 @@ class App:
         self.model.listData.entires = None
         self.model.listData.elementType = None
         
-        self.model.fieldsData.elementPath = None
-        self.model.fieldsData.containerPath = None
-        self.model.fieldsData.elementMatch = None
-        self.model.fieldsData.containerMatch = None
-        self.model.fieldsData.key = None
-        self.model.fieldsData.fields = None
-        self.model.fieldsData.elementType = None
+        self.model.itemData.elementPath = None
+        self.model.itemData.containerPath = None
+        self.model.itemData.elementMatch = None
+        self.model.itemData.containerMatch = None
+        self.model.itemData.key = None
+        self.model.itemData.item = None
+        self.model.itemData.elementType = None
+
+        self.listMgr = ListMgr(self.model.listData, self.model.document)
+        self.itemMgr = None
 
     def configure(self, settings=None):
         pass
@@ -61,6 +65,7 @@ class App:
                 log.info(f'TestModule is a special module for test, find it at {mpath}')
                 m = importlib.import_module(mpath)
             self.model.dataModule = m
+            self.initialize()
         else:
             m = None
         return m
@@ -70,8 +75,8 @@ class App:
             with open(fpath, 'r', encoding='utf8') as fin:
                 self.model.documentPath = fpath
                 self.model.document = json.load(fin)
+                self.listMgr.document = self.model.document
             self.loadModule()
-            self.initialize()
         else:
             log.warning(f'JSON file at {fpath} does not exist')
         pass
@@ -87,6 +92,22 @@ class App:
             dnull = self.model.document is None
             log.warning(f'    Output directory = {dn}, document null? {dnull}')
         pass
+
+    def newDocument(self):
+        module_name = None
+        if self.model.dataModule is not None:
+            module_name = self.model.dataModule.__name__
+        self.model.documentPath = None
+        e = self.listMgr.newElement(self.model.documentClass)
+        self.model.document = e
+        self.model.document['metadata']['dataModule'] = module_name
+        self.listMgr.document = e
+        log.info(f'New document {self.model.document}')
+        pass
+
+    def saveAs(self, fileName: str):
+        self.model.documentPath = fileName
+        self.save()
 
     def save(self):
         fn1 = self.model.documentPath.replace('.json', '-tmp.json')
@@ -110,264 +131,91 @@ class App:
         return list(map(lambda x: x.name, self.model.selectors))
 
     def getList(self, selectorName, *args):
-        ldata = self.model.listData
-        ldata.collection = selectorName
+        self.model.listData.collection = selectorName
         selector = self.findSelector(selectorName)
-        v = selector.query(self.model.document, *args)
-        if v is None:
-            ldata.jsonPath = None
-            ldata.jsonMatches = None
-            ldata.entries = None
-            ldata.elementType = None
-        else:
-            ldata.jsonPath = selector.expr(selector.jsonPath, *args)
-            ldata.jsonMatches = [ x for x in v ]
-            ldata.entries = selector.findall(self.model.document, *args)
-            ldata.elementType = selector.elementType
-        return ldata.entries
+        selector.composePath(*args)
+        v = self.listMgr.findall(selector)
+        log.info(f' v = {v}, entries = {self.listMgr.entries}')
+        return v
 
     def findall(self, jpath):
         entries = jsonpath.findall(jpath, self.model.document)
         return entries
     
     def showList(self):
-        ldata = self.model.listData
-        n = len(ldata.entries)
-        log.info(f'List of {ldata.collection} (x{n})')
-        for i, entry in enumerate(ldata.entries):
-            log.info(f'  [{i}] {entry}')
+        log.info(f'Show list')
+        if self.listMgr is not None:
+            self.listMgr.show()
+        else:
+            log.warning(f'ListMgr is none, nothing to show')
 
-    def addItem(self, *keyValues):
-        log.info(f'addItem {keyValues}')
-        ldata = self.model.listData
-        fdata = self.model.fieldsData
+    def newItem(self):
+        e = self.listMgr.newElement()
+        log.info(f'newItem {e}')
+        self.model.itemData.item = e
+        self.itemMgr = createItemMgr(self.model.itemData, self.model.document)
+        self.itemMgr.newItem(self.listMgr)
 
-        obj = {}
-        cpath = ldata.jsonPath
-        ip = cpath.rfind('[')
-        if ip > 0:
-            cpath = cpath[0:ip]
-        log.info(f'  get container {cpath}')
-        matches = list(jsonpath.query(cpath, self.model.document))
-        if len(matches)==1:
-            cmatch = matches[0]
-            pointer = cmatch.pointer()
-            cont = pointer.resolve(self.model.document)
+    def selectItem(self, ientry=None):
+        log.info(f'selectItem {self.listMgr.data.entries}')
+        if ientry is None:
+            return self.newItem()
+        elif self.listMgr.data.entries is not None and \
+            ientry >= 0 and ientry < len(self.listMgr.data.entries):
+            self.model.listData.key = ientry
+            self.model.itemData.item = self.model.listData.entries[ientry]
+            self.itemMgr = createItemMgr(self.model.itemData, self.model.document)
+            self.itemMgr.update(self.listMgr)
 
-            fdata.elementPath = None
-            fdata.containerPath = cmatch.path
-            fdata.elementKey = None
-            fdata.elementMatch = None
-            fdata.containerMatch = cmatch
-            fdata.elementType = ldata.elementType
+    def setField(self, key, value):
+        tim = type(self.itemMgr)
+        log.info(f'setField {tim}')
+        if tim == ObjectItemMgr:
+            self.itemMgr.setField(key, value)
 
-        for kv in keyValues:
+    def setValue(self, value: int | float | str):
+        log.info(f'setValue')
+        tim = type(self.itemMgr)
+        if tim == ScalarItemMgr:
+            self.itemMgr.setValue(value)
+
+    def saveItem(self):
+        log.info(f'updateItem')
+        self.itemMgr.save()
+
+    def addItem(self, *args):
+        log.info(f'addItem {args}')
+        if len(args)==0:
+            log.warning(f'  Item was not given, doing nothing')
+
+        self.newItem()
+        for kv in args:
             k, v = readKeyValue(kv)
-            if k is not None:
-                obj[k] = v
-
-        if cont is not None:
-            log.info(f'  add object to the list (x{len(cont)})')
-            cont.append(obj)
-
-            ekey = len(cont) - 1
-            epath = cpath + f'[{ekey}]'
-            log.info(f'  New item path {epath}')
-            matches = list(jsonpath.query(epath, self.model.document))
-            fdata.elementPath = epath
-            fdata.elementKey = ekey
-            if len(matches)==1:
-                ematch = matches[0]
-                ldata.jsonMatches.append(ematch)
-                ldata.entries.append(obj)
-                fdata.elementMatch = None
-            fdata.fields = obj
-
+            if k is None: continue
+            self.setField(k, v)
+        self.saveItem()
 
     def addValue(self, value):
         log.info(f'addItem {value}')
-        ldata = self.model.listData
-        fdata = self.model.fieldsData
+        self.newItem()
+        self.setValue(value)
+        self.saveItem()
 
-        value = ldata.elementType(value)
-
-        cpath = ldata.jsonPath
-        ip = cpath.rfind('[')
-        if ip > 0:
-            cpath = cpath[0:ip]
-        log.info(f'  get container {cpath}')
-        matches = list(jsonpath.query(cpath, self.model.document))
-        if len(matches)==1:
-            cmatch = matches[0]
-            pointer = cmatch.pointer()
-            cont = pointer.resolve(self.model.document)
-
-            fdata.elementPath = None
-            fdata.containerPath = cmatch.path
-            fdata.elementKey = None
-            fdata.elementMatch = None
-            fdata.containerMatch = cmatch
-            fdata.elementType = ldata.elementType
-
-        if cont is not None:
-            log.info(f'  add value to the list (x{len(cont)})')
-            cont.append(value)
-
-            ekey = len(cont) - 1
-            epath = cpath + f'[{ekey}]'
-            log.info(f'  New item path {epath}')
-            matches = list(jsonpath.query(epath, self.model.document))
-            fdata.elementPath = epath
-            fdata.elementKey = ekey
-            if len(matches)==1:
-                ematch = matches[0]
-                ldata.jsonMatches.append(ematch)
-                ldata.entries.append(value)
-                fdata.elementMatch = None
-            fdata.fields = { 'Value': value}
-
-    def deleteItem(self, selectorName, *args):
+    def deleteItem(self, ientry):
         log.info(f'deleteItem')
-        ldata = self.model.listData
-        cont, key = None, None
+        self.listMgr.deleteItem(ientry)
 
-        selector = self.findSelector(selectorName)
-        matches = list(selector.query(self.model.document, *args))
-        if len(matches)>0:
-            match0 = matches[0]
-            pointer = match0.pointer()
-            cont, _ = pointer.resolve_parent(self.model.document)
-            mg = re.search(r'.*\[(.*?)\]$', match0.path)
-            if mg:
-                key = int(mg.group(1))
-            if key >= 0 and key < len(cont):
-                del cont[key]
-                del ldata.jsonMatches[key]
-                del ldata.entries[key]
-            else:
-                log.warning(f'  key={key} is out-of-range {key>=0} {key<len(cont)}')
-        else:
-            log.warning(f'  found no matches')
-
-    def getItem(self, selectorName, *args):
-        fdata = self.model.fieldsData
-        selector = self.findSelector(selectorName)
-        v = selector.query(self.model.document, *args)
-        if v is None:
-            pass
-        else:
-            v = list(v)
-            expr = selector.expr(selector.jsonPath, *args)
-            if len(v) == 0:
-                log.warning(f'  No item was found for {expr}')
-            elif len(v) > 1:
-                log.warning(f'  More than one items were found for {expr}')
-            else:
-                jmatch = v[0]
-                entry = selector.findall(self.model.document, *args)[0]
-                fdata.elementPath = jmatch.path
-                fdata.containerPath = jmatch.parent.path
-                fdata.elementKey = None
-                fdata.elementMatch = jmatch
-                fdata.containerMatch = jmatch.parent
-                fdata.elementType = selector.elementType
-                if fdata.isEntrySimple():
-                    fdata.fields = { 'Value': entry }
-                else:
-                    fdata.fields = entry
-                log.info(f'  fdata={fdata}')
-        
     def showItem(self):
-        fdata = self.model.fieldsData
+        fdata = self.model.itemData
         log.info(f'Item fields {fdata.elementPath}')
-        for key, value in fdata.fields.items():
-            log.info(f'  [{key}] {value}')
+        if fdata.item is not None:
+            for key, value in fdata.item.items():
+                log.info(f'  [{key}] {value}')
 
-    def enableField(self, *fieldNames):
-        fdata = self.model.fieldsData
-        epath = fdata.elementPath
-        if fdata.isEntrySimple():
-            log.warning(f'  Cannot enable a field for a simple item')
-        else:
-            pointer = fdata.elementMatch.pointer()
-            obj = pointer.resolve(self.model.document)
-            f1 = fields(fdata.elementType)
-            names = list(map(lambda x: x.name, f1))
-            for fieldName in fieldNames:
-                if fieldName in names:
-                    if fieldName in obj.keys(): continue
-                    f2 = list(filter(lambda x: x.name == fieldName, f1))
-                    if len(f2) == 1:
-                        ftype = mainType(f2[0])
-                        obj[fieldName] = ftype()
-                else:
-                    log.warning(f'  field {fieldName} is not valid')
-                    continue
-        self.save()
-            
-    def disableField(self, *fieldNames):
-        fdata = self.model.fieldsData
-        epath = fdata.elementPath
-        if fdata.isEntrySimple():
-            log.warning(f'  Cannot enable a field for a simple item')
-        else:
-            pointer = fdata.elementMatch.pointer()
-            obj = pointer.resolve(self.model.document)
-            f1 = fields(fdata.elementType)
-            names = list(map(lambda x: x.name, f1))
-            for fieldName in fieldNames:
-                if fieldName in obj.keys():
-                    obj.pop(fieldName)
-        self.save()
-            
+
     def findSelector(self, sname):
         selector = None
         v = list(filter(lambda x: x.name == sname, self.model.selectors))
         if len(v) == 1:
             selector = v[0]
         return selector
-
-    def setFieldValue(self, fieldName, value):
-        fdata = self.model.fieldsData
-        fdata = self.model.fieldsData
-        if fdata.isEntrySimple():
-            log.warning(f'  Cannot set field value for a simple type')
-        else:
-            pointer = fdata.elementMatch.pointer()
-            obj = pointer.resolve(self.model.document)
-            obj[fieldName] = value
-        self.save()
-
-    def setItemValue(self, value):
-        fdata = self.model.fieldsData
-        if fdata.isEntrySimple():
-            pointer = fdata.containerMatch.pointer()
-            v = pointer.resolve(self.model.document)
-            key = fdata.itemKey()
-            v[key] = value
-        else:
-            log.warning(f'  Current item is not of a simple type')
-        self.save()
-
-    def setFieldValue1(self, jpath, value):
-        matches = jsonpath.query(jpath, self.model.document)
-        matches = list(matches)
-        match len(matches):
-            case 0:
-                log.warning(f'  JSONPath {jpath} returned zero matches')
-                return None
-            case 1:
-                pointer = matches[0].pointer()
-                parent = pointer.resolve_parent(self.model.document)
-                key = str(pointer).split('/')[-1]
-                if parent is None or key is None:
-                    log.warning(f'  JSONPath {jpath} ->  parent or key is None')
-                    return None
-                if type(parent) == list:
-                    parent[int(key)] = value
-                else:
-                    parent[key] = value
-            case _:
-                log.warning(f'  JSONPath {jpath} returned more than 1 matches')
-                return None
-            

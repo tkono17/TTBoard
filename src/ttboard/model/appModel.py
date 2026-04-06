@@ -45,18 +45,18 @@ class ListData:
                 if ip > 0:
                     cpath = self.jsonPath[0:ip]
         return cpath
-
+    
 @dataclass
-class FieldsData:
+class ItemData:
     elementPath: str | None = None
     containerPath: str | None = None
     elementKey: int | str | None = None
     elementMatch: list[jsonpath.JSONPathMatch] | None = None
     containerMatch: list[jsonpath.JSONPathMatch] | None = None
-    fields: dict[str, Any] | None = None
+    item: int | float | str | list[Any] | dict[str, Any] | None = None
     elementType: int | float | str | list[Any] | dict[str,Any] | None = None
     
-    def isEntrySimple(self):
+    def isItemScalar(self):
         return self.elementType in (int, float, str)
 
     def update(self, ldata: ListData,
@@ -67,7 +67,7 @@ class FieldsData:
         self.elementKey = ientry
         self.elementMatch = ldata.jsonMatches[ientry]
         self.containerMatch = ldata.jsonMatches[ientry].parent
-        self.fields = obj
+        self.item = obj
         self.elementType = ldata.elementType
 
     def itemKey(self):
@@ -92,6 +92,6 @@ class AppModel:
     selectors: list[JsonSelector] | None = None
     #
     listData: ListData = field(default_factory=ListData)
-    fieldsData: FieldsData = field(default_factory=FieldsData)
+    itemData: ItemData = field(default_factory=ItemData)
     
     
