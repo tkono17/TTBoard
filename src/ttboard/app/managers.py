@@ -4,6 +4,7 @@ from dataclasses import fields, asdict, MISSING
 from typing import Any
 import logging
 from ..model import ItemData, ListData
+from ..tools import readScalar
 
 log = logging.getLogger(__name__)
 
@@ -138,20 +139,30 @@ class ItemMgr:
 
     def update(self, listMgr: ListMgr):
         ldata = listMgr.data
-        ematch = ldata.jsonMatches[0] if len(ldata.jsonMatches)>0 else None
+        ematch = ldata.jsonMatches[ldata.key] if len(ldata.jsonMatches)>0 else None
 
         self.data.elementMatch = ematch
         self.data.containerMatch = ematch.parent
-        self.data.elementPath = listMgr.elementPath()
+        self.data.elementPath = listMgr.elementPath(ldata.key)
         self.data.containerPath = listMgr.containerPath()
-        self.data.elementKey = ldata.key
+        self.data.elementType = listMgr.elementType
+
+        log.info(f'  ematch: {ematch}')
+        log.info(f'  epath = {self.data.elementPath}')
+        if self.data.elementPath is not None:
+            mg = re.match(r'.*\[(.*?)\]$', self.data.elementPath)
+            if mg is not None:
+                key = readScalar(mg.group(1))
+                self.data.elementKey = key
+                log.info(f'  Key found in ItemMgr is {key}')
+            else:
+                log.warning(f'  Failed to parse element path {self.data.elementPath}')
+        else:
+            log.warning(f'  element path is none')
         self.data.elementMatch = ematch
         pmatches = list(jsonpath.query(self.data.containerPath, self.document))
         self.data.containerMatch = pmatches[0] if len(pmatches)>0 else None
-        log.info(f'update = {ldata.key}')
-        self.data.item = ldata.entries[ldata.key] if ldata.key is not None else None
-        self.data.elementType = listMgr.elementType
-
+        
     def query(self, selector):
         self.clear()
 
@@ -183,7 +194,16 @@ class ItemMgr:
         self.data.elementType = listMgr.elementType
     
     def save(self):
-        if self.data.containerMatch is not None:
+        if self.data.elementMatch is not None:
+            pointer = self.data.elementMatch.pointer()
+            parent, _ = pointer.resolve_parent(self.document)
+            log.info(f'save parent= {parent}')
+            if type(parent) == list:
+                log.info(f'  save item at [{self.data.elementKey}]')
+                parent[self.data.elementKey] = self.data.item
+            else:
+                log.warning(f'  Cannot save item to a non-list container')
+        elif self.data.containerMatch is not None:
             pointer = self.data.containerMatch.pointer()
             parent = pointer.resolve(self.document)
             if self.data.elementKey is not None:
@@ -192,6 +212,10 @@ class ItemMgr:
                 parent.append(self.data.item)
                 n = len(parent)
                 self.data.elementKey = n-1
+                epath = self.containerMatch.path + f'[{self.data.elementKey}]'
+                matches = jsonpath.query(epath, self.document)
+                if len(matches)==0:
+                    self.data.elementMatch = matches[0]
 
 class ScalarItemMgr(ItemMgr):
     def __init__(self, itemData, document):

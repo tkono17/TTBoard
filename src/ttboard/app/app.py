@@ -36,9 +36,6 @@ class App:
         self.listMgr = ListMgr(self.model.listData, self.model.document)
         self.itemMgr = None
 
-    def configure(self, settings=None):
-        pass
-
     def initialize(self):
         self.model.documentClass = None
         self.model.selectors = None
@@ -110,6 +107,7 @@ class App:
         self.save()
 
     def save(self):
+        log.info(f'Save {self.model.document}')
         fn1 = self.model.documentPath.replace('.json', '-tmp.json')
         fn2 = self.model.documentPath.replace('.json', '-backup.json')
         if os.path.exists(fn1):
@@ -142,13 +140,6 @@ class App:
         entries = jsonpath.findall(jpath, self.model.document)
         return entries
     
-    def showList(self):
-        log.info(f'Show list')
-        if self.listMgr is not None:
-            self.listMgr.show()
-        else:
-            log.warning(f'ListMgr is none, nothing to show')
-
     def newItem(self):
         e = self.listMgr.newElement()
         log.info(f'newItem {e}')
@@ -172,38 +163,64 @@ class App:
         log.info(f'setField {tim}')
         if tim == ObjectItemMgr:
             self.itemMgr.setField(key, value)
+            self.itemMgr.save()
 
     def setValue(self, value: int | float | str):
         log.info(f'setValue')
         tim = type(self.itemMgr)
         if tim == ScalarItemMgr:
             self.itemMgr.setValue(value)
+            self.itemMgr.save()
 
     def saveItem(self):
-        log.info(f'updateItem')
-        self.itemMgr.save()
+        log.info(f'saveItem')
+        if self.itemMgr is not None:
+            self.itemMgr.save()
+        else:
+            log.warning(f'  Failed to save item since item is not selected')
 
+    def updateItem(self, *args):
+        log.info(f'updateItem {args}')
+        if len(args)==0:
+            log.warning(f'  Item was not given, doing nothing')
+        for kv in args:
+            k, v = readKeyValue(kv)
+            if k is None: continue
+            self.setField(k, v)
+        self.saveItem()
+        self.save()
+        
+    def deleteItem(self, ientry):
+        log.info(f'deleteItem')
+        self.listMgr.deleteItem(ientry)
+        self.save()
+
+    # Combined methods only for CLI
     def addItem(self, *args):
         log.info(f'addItem {args}')
         if len(args)==0:
             log.warning(f'  Item was not given, doing nothing')
-
         self.newItem()
         for kv in args:
             k, v = readKeyValue(kv)
             if k is None: continue
             self.setField(k, v)
         self.saveItem()
+        self.save()
 
     def addValue(self, value):
         log.info(f'addItem {value}')
         self.newItem()
         self.setValue(value)
         self.saveItem()
+        self.save()
 
-    def deleteItem(self, ientry):
-        log.info(f'deleteItem')
-        self.listMgr.deleteItem(ientry)
+    def showList(self):
+        log.info(f'Show list')
+        if self.listMgr is not None:
+            self.listMgr.show()
+        else:
+            log.warning(f'ListMgr is none, nothing to show')
 
     def showItem(self):
         fdata = self.model.itemData
@@ -212,6 +229,14 @@ class App:
             for key, value in fdata.item.items():
                 log.info(f'  [{key}] {value}')
 
+    def showExamples(self):
+        log.info(f'Examples:')
+        log.info(f'* Create a new document of a given model')
+        log.info(f'  > loadModule ttboard.testmodel')
+        log.info(f'  > newDocument')
+        log.info(f'  > saveAs a.json')
+        log.info(f'* Add entries to the lists')
+        log.info(f'* Modify entries in the lists')
 
     def findSelector(self, sname):
         selector = None
