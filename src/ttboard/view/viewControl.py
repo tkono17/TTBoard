@@ -26,6 +26,18 @@ class ViewControl:
         # Data related to panels
         self.vmodel = ViewModel()
 
+    def updateListViewModel(self, listData):
+        self.vmodel.listView.update(listData)
+
+    def updateItemViewModel(self, itemData):
+        self.vmodel.itemView.update(itemData)
+        
+    def updateListView(self):
+        pass
+
+    def updateItemView(self):
+        pass
+
     def addWidget(self, wname, w):
         self.widgets[wname] = w
         log.info(f'  Added widget {wname}')
@@ -104,12 +116,12 @@ class ViewControl:
 
     def selectObject(self):
         ldata = self.app.model.listData
-        fdata = self.app.model.fieldsData
+        fdata = self.app.model.itemData
         fview = self.vmodel.fieldView
 
         fview.elementPath.set(fdata.elementPath)
         log.info(f'Select object at {fview.elementPath.get()}')
-        obj = fdata.fields
+        obj = fdata.item
         keys = obj.keys()
         rows = []
         fieldNames = []
@@ -194,7 +206,7 @@ class ViewControl:
 
     def onEntrySelected(self, event):
         ldata = self.app.model.listData
-        fdata = self.app.model.fieldsData
+        fdata = self.app.model.itemData
         fview = self.vmodel.fieldView
         
         log.info(f'Entry selected in {event.widget}')
@@ -226,7 +238,7 @@ class ViewControl:
 
     def onNewEntry(self):
         ldata = self.app.model.listData
-        fdata = self.app.model.fieldsData
+        fdata = self.app.model.itemData
         lview = self.vmodel.listView
         fview = self.vmodel.fieldView
         
@@ -249,7 +261,7 @@ class ViewControl:
         fdata.containerPath = cpath
         fdata.jsonMatch = None
         fdata.parentMatch = None
-        fdata.fields = obj
+        fdata.item = obj
         fdata.elementType = ldata.elementType
 
         fview.elementPath.set(cpath)
@@ -269,7 +281,7 @@ class ViewControl:
         
     def onSaveFields(self, event):
         fview = self.vmodel.fieldView
-        fdata = self.app.model.fieldsData
+        fdata = self.app.model.itemData
 
         log.info(f'Save object state={fview.state}')
         cpath = fview.elementPath.get()
