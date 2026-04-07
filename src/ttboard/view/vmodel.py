@@ -1,8 +1,9 @@
 from typing import Optional, Any
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 import tkinter as tk
 from tkinter import ttk
 import jsonpath
+from ..model import ListData, ItemData
 
 @dataclass
 class FieldState:
@@ -15,6 +16,21 @@ class ListViewModel:
     jsonPath: tk.StringVar = field(default_factory=tk.StringVar)
     fieldStates: list[FieldState] | None = field(default_factory=list)
     displayStyle: str = 'table'
+
+    def update(self, listData: ListData):
+        self.collection = tk.StringVar(textvariable=listData.collection)
+        self.jsonPath = tk.StringVar(textvariable=listData.jsonPath)
+        self.fieldStates = []
+        self.displayStyle = 'table'
+        if listData.isListSimple():
+            self.fieldStates.append(FieldState('Value', True))
+        elif listData.elementType is list:
+            self.fieldStates.append(FieldState('Value', True))
+        else:
+            if hasattr(listData.elementType, '__dataclass_fields__'):
+                fv = fields(listData.elementType)
+                for f in fv:
+                    self.fieldStates.append(FieldState(fv.name, True))
 
     def isSimpleEntry(self):
         return self.entryType in (int, float, str)
@@ -47,6 +63,14 @@ class FieldViewModel:
     rows: list[FieldRow] | None = field(default_factory=list)
     state: str | None = None
     useIncludeButton: bool = True
+
+    def update(self, itemData: ItemData):
+        self.elementPath = tk.StringVar(textvariable=itemData.elementPath)
+        self.key = itemData.elementKey
+        self.rows = []
+        self.state = None
+        self.useIncludeButton = True
+
 
     def setState(self, newState):
         if newState == 'Modified' and self.state == 'New':
