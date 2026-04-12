@@ -1,0 +1,78 @@
+from dataclasses import fields
+import tkinter as tk
+from ..model import ListData, ItemData
+from .vmodel import ListViewModel, FieldState, FieldValues, ItemViewModel, FieldRow
+
+def isSimpleType(etype):
+    if etype in (int, float, str):
+        return True
+    else:
+        return False
+    
+class ListViewMgr:
+    def __init__(self, vmodel: ListViewModel):
+        self.lvdata = vmodel
+
+    def updateHeaderRows(self):
+        self.lvdata.header = []
+        self.lvdata.rows = []
+        self.lvdata.header = [ fstate.name for fstate 
+                              in filter(lambda x: x.isActive, self.lvdata.fieldStates)]
+        if isSimpleType(self.lvdata.elementType):
+            for item in self.lvdata.items:
+                fvalues = FieldValues([item])
+                self.lvdata.rows.append(fvalues)
+        elif self.lvdata.elementType == list:
+            for item in self.lvdata.items:
+                fvalues = FieldValues([f'list[{len(item)}]'])
+                self.lvdata.rows.append(fvalues)
+        else:
+            for item in self.lvdata.items:
+                values = []
+                for k, v in item.items():
+                    if k not in self.lvdata.header: continue
+                    values.append(v)
+                fvalues = FieldValues(values)
+                self.lvdata.rows.append(fvalues)
+        pass
+
+    def update(self, ldata: ListData):
+        self.lvdata.collection = tk.StringVar(value=ldata.collection)
+        self.lvdata.jsonPath = tk.StringVar(value=ldata.jsonPath)
+        self.lvdata.items = ldata.entries
+        self.lvdata.Type = ldata.elementType
+        self.lvdata.fieldStates = []
+        self.lvdata.displayStyle = 'table'
+        if ldata.isListSimple():
+            self.lvdata.fieldStates.append(FieldState('Value', True))
+        elif ldata.elementType is list:
+            self.lvdata.fieldStates.append(FieldState('Value', True))
+        else:
+            if hasattr(ldata.elementType, '__dataclass_fields__'):
+                fv = fields(ldata.elementType)
+                for f in fv:
+                    self.lvdata.fieldStates.append(FieldState(f.name, True))
+        self.updateHeaderRows()
+
+class ItemViewMgr:
+    def __init__(self, vmodel: ItemViewModel):
+        self.ivdata = vmodel
+
+    def update(self, idata: ItemData):
+        self.ivdata.elementPath = tk.StringVar(value=idata.elementPath)
+        self.ivdata.key = idata.elementKey
+        self.ivdata.rows = []
+        self.ivdata.state = 'Set'
+        self.ivdata.useIncludeButton = True
+        if isSimpleType(idata.elementType):
+            frow = FieldRow(name='Value', isActive=True, value=idata.item, valueType=idata.elementType)
+            self.ivdata.rows.append(frow)
+        elif idata.elementType == list:
+            n = len(idata.item)
+            frow = FieldRow(name='Value', isActive=True, value=f'list[{n}]', valueType=list)
+            self.ivdata.rows.append(frow)
+        else:
+            for c, value in idata.item.items():
+                frow = FieldRow(name=c, isActive=True, value=value, valueType=type(value))
+                self.ivdata.rows.append(frow) 
+

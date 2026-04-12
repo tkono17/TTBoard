@@ -35,7 +35,7 @@ class PathRow(tk.Frame):
         super().__init__(master, **kwargs)
         
     def build(self, vc):
-        fview = vc.vmodel.fieldView
+        fview = vc.vmodel.itemView
         
         jpathLabel = tk.Label(self, text='JSONPath: ')
         jpathText = tk.Entry(self, textvariable=fview.elementPath)
@@ -123,7 +123,7 @@ class ObjectPanel(tk.Frame):
         super().__init__(master, **kwargs)
 
     def build(self, vc):
-        fview = vc.vmodel.fieldView
+        fview = vc.vmodel.itemView
         
         label = tk.Label(self, text='Object view')
         jsonPath = PathRow(self)

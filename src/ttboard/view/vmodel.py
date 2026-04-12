@@ -11,26 +11,19 @@ class FieldState:
     isActive: bool = True
 
 @dataclass
+class FieldValues:
+    values: list[int|float|str|None] = field(default_factory=list)
+
+@dataclass
 class ListViewModel:
     collection: tk.StringVar | None = field(default_factory=tk.StringVar)
     jsonPath: tk.StringVar = field(default_factory=tk.StringVar)
+    items: list[Any] = field(default_factory=list)
+    elementType: Any | None = None
     fieldStates: list[FieldState] | None = field(default_factory=list)
+    header: list[str] = field(default_factory=list)
+    rows: list[FieldValues] = field(default_factory=list)
     displayStyle: str = 'table'
-
-    def update(self, listData: ListData):
-        self.collection = tk.StringVar(textvariable=listData.collection)
-        self.jsonPath = tk.StringVar(textvariable=listData.jsonPath)
-        self.fieldStates = []
-        self.displayStyle = 'table'
-        if listData.isListSimple():
-            self.fieldStates.append(FieldState('Value', True))
-        elif listData.elementType is list:
-            self.fieldStates.append(FieldState('Value', True))
-        else:
-            if hasattr(listData.elementType, '__dataclass_fields__'):
-                fv = fields(listData.elementType)
-                for f in fv:
-                    self.fieldStates.append(FieldState(fv.name, True))
 
     def isSimpleEntry(self):
         return self.entryType in (int, float, str)
@@ -41,8 +34,8 @@ class ListViewModel:
 
 @dataclass
 class FieldRow:
-    isActive: bool = True
     name: str | None = None
+    isActive: bool = True
     value: tk.StringVar | list[Any] | dict[str,Any] | None = None
     valueType: int | str | float | list | dict | Any | None = None
 
@@ -57,20 +50,12 @@ class FieldRow:
         return value
             
 @dataclass
-class FieldViewModel:
+class ItemViewModel:
     elementPath: tk.StringVar = field(default_factory=tk.StringVar)
     key: str | int | None = None
     rows: list[FieldRow] | None = field(default_factory=list)
     state: str | None = None
     useIncludeButton: bool = True
-
-    def update(self, itemData: ItemData):
-        self.elementPath = tk.StringVar(textvariable=itemData.elementPath)
-        self.key = itemData.elementKey
-        self.rows = []
-        self.state = None
-        self.useIncludeButton = True
-
 
     def setState(self, newState):
         if newState == 'Modified' and self.state == 'New':
@@ -92,5 +77,5 @@ class FieldViewModel:
 @dataclass
 class ViewModel:
     listView: ListViewModel = field(default_factory=ListViewModel)
-    fieldView: FieldViewModel = field(default_factory=FieldViewModel)
+    itemView: ItemViewModel = field(default_factory=ItemViewModel)
 

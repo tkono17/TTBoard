@@ -8,6 +8,7 @@ import re
 from ..tools import mainType
 from .tableManager import TableManager, FieldsManager
 from .vmodel import ViewModel, FieldState, FieldRow
+from .vmanagers import ListViewMgr, ItemViewMgr
 
 log = logging.getLogger(__name__)
 
@@ -26,6 +27,9 @@ class ViewControl:
         # Data related to panels
         self.vmodel = ViewModel()
 
+        self.listViewMgr = ListViewMgr(self.vmodel.listView)
+        self.itemViewMgr = ItemViewMgr(self.vmodel.itemView)
+
     def updateListViewModel(self, listData):
         self.vmodel.listView.update(listData)
 
@@ -33,7 +37,7 @@ class ViewControl:
         self.vmodel.itemView.update(itemData)
         
     def updateListView(self):
-        pass
+        self.updateListTable()
 
     def updateItemView(self):
         pass
@@ -63,7 +67,7 @@ class ViewControl:
     def updateTableEntries(self, table, tableMgr):
         if table:
             table.delete(*table.get_children())
-            ocolumns = tableMgr.orderedColumns()
+            ocolumns = tableMgr.columns
             log.info(f'  ordered columns: {ocolumns}')
 
             table.config(show='tree headings', columns=ocolumns)
@@ -74,7 +78,9 @@ class ViewControl:
             table.heading('#0', text='Icon')
             table.column('#0', minwidth=50, width=60, stretch=tk.NO)
             entries = tableMgr.getEntries()
-            for values, image in entries:
+            for fvalues, image in entries:
+                values = fvalues.values
+                log.info(f'values= {values}')
                 if image is not None:
                     table.insert('', 'end', image=image, values=values)
                 else:
@@ -82,7 +88,7 @@ class ViewControl:
         pass
     
     def updateFieldEntries(self, table, fieldMgr):
-        fview = self.vmodel.fieldView
+        fview = self.vmodel.itemView
         fview.updateRows()
         #log.info(f'  updated fields: {fview.orderedFields()}')
         #log.info(f'  updated rows: {fieldMgr.model.rows}')
@@ -90,34 +96,23 @@ class ViewControl:
         pass
     
     def updateListTable(self):
-        lview = self.vmodel.listView
-        ldata = self.app.model.listData
-
-        if ldata.isListSimple():
-            lview.fieldStates = [ FieldState('Value', True) ]
-        else:
-            lview.fieldStates = [
-                FieldState(f.name, True) for f in fields(ldata.elementType)
-                ]
+        lvdata = self.vmodel.listView
         tree = self.findWidget('listTable')
-        columnsEn = [ x.name for x in filter(lambda y: y.isActive, lview.fieldStates)]
-        if lview.displayStyle == 'table':
-            allColumns = list(map(lambda x: x.name, lview.fieldStates))
-            entries = ldata.entries
-            if ldata.isListSimple():
-                entries = [ { 'Value': x } for x in ldata.entries ]
-            self.listTableMgr = TableManager(columnsEn,
-                                             entries,
-                                             allColumns=allColumns,
+        columnsEn = lvdata.header
+        if lvdata.displayStyle == 'table':
+            self.listTableMgr = TableManager(lvdata.header,
+                                             lvdata.rows,
                                              useDeleteButton=True)
             self.updateTableEntries(tree, self.listTableMgr)
-        elif lview.displayStyle == 'board':
-            self.updateBoardEntries(tree, entries, columnsEn)
+        elif lvdata.displayStyle == 'board':
+            #self.updateBoardEntries(tree, entries, columnsEn)
+            log.warning('Board view not supported yet')
+            pass
 
     def selectObject(self):
         ldata = self.app.model.listData
         fdata = self.app.model.itemData
-        fview = self.vmodel.fieldView
+        fview = self.vmodel.itemView
 
         fview.elementPath.set(fdata.elementPath)
         log.info(f'Select object at {fview.elementPath.get()}')
@@ -147,7 +142,7 @@ class ViewControl:
         log.info(f'  fview = {fview}, rows={fview.rows}')
         
     def updateObject(self):
-        fview = self.vmodel.fieldView
+        fview = self.vmodel.itemView
         self.fieldMgr = FieldsManager(fview)
         tree = self.findWidget('objectTable')
         self.updateFieldEntries(tree, self.fieldMgr)
@@ -178,7 +173,7 @@ class ViewControl:
         lview.collection.set(event.widget.get())
         selector = self.app.findSelector(lview.collection.get())
         if selector:
-            lview.jsonPath.set(selector.jsonPath.replace('%s', '*'))
+            lview.jsonPath.set(selector.pathTemplate.replace('%s', '*'))
         else:
             lview.jsonPath.set('$.')
 
@@ -188,42 +183,28 @@ class ViewControl:
         
         args = re.findall(r'\[(.*?)\]', lview.jsonPath.get())
         v = self.app.getList(lview.collection.get(), *args)
-        selector = self.app.findSelector(lview.collection.get())
-        if selector:
-            cls = selector.elementType
-            ldata.elementType = cls
-            if hasattr(cls, '__dataclass_fields__'):
-                lview.fieldStates = [ (x, True) for x 
-                                     in cls.__dataclass_fields__.keys()]
-            elif cls in (int, float, str):
-                lview.fieldStates = [ ('Value', True) ]
-            else:
-                log.warning(f'Do not know how to handle type {cls}')
-        else:
-            log.warning(f'No selector for list {lview.collection.get()}')
-            lview.fieldStates = []
+        self.listViewMgr.update(self.app.model.listData)
         self.updateListTable()
 
     def onEntrySelected(self, event):
-        ldata = self.app.model.listData
-        fdata = self.app.model.itemData
-        fview = self.vmodel.fieldView
-        
         log.info(f'Entry selected in {event.widget}')
         tree = event.widget
         if tree.identify_region(event.x, event.y) == 'cell':
             rows = tree.selection()
             if len(rows) == 1:
                 irow = tree.index(rows[0])
-                entry = ldata.entries[irow]
-                if ldata.isListSimple():
-                    obj = { 'Value': str(entry) }
-                else:
-                    obj = entry
-                fdata.update(ldata, irow, obj)
-                fview.elementPath.set(fdata.elementPath)
-                fview.key = irow
-                fview.setState('Set')
+                self.app.selectItem(irow)
+                self.itemViewMgr.update(self.app.model.itemData)
+
+                #entry = ldata.entries[irow]
+                #if ldata.isListSimple():
+                #    obj = { 'Value': str(entry) }
+                #else:
+                #    obj = entry
+                #fdata.update(ldata, irow, obj)
+                #fview.elementPath.set(fdata.elementPath)
+                #fview.key = irow
+                #fview.setState('Set')
                 self.selectObject()
                 self.updateObject()
 
@@ -232,7 +213,7 @@ class ViewControl:
     
     def onFieldClicked(self, irow, event):
         log.info(f'Field clicked {event.widget} irow={irow}')
-        fview = self.vmodel.fieldView
+        fview = self.vmodel.itemView
         fview.rows[irow].isActive = not fview.rows[irow].isActive
         self.updateObject()
 
@@ -240,7 +221,7 @@ class ViewControl:
         ldata = self.app.model.listData
         fdata = self.app.model.itemData
         lview = self.vmodel.listView
-        fview = self.vmodel.fieldView
+        fview = self.vmodel.itemView
         
         jpath = lview.jsonPath.get()
         log.info(f'Find parent path of {jpath}')
@@ -276,11 +257,11 @@ class ViewControl:
 
     def onFieldChanged(self, *args):
         log.info(f'Field changed')
-        fview = self.vmodel.fieldView
+        fview = self.vmodel.itemView
         fview.setState('Modified')
         
     def onSaveFields(self, event):
-        fview = self.vmodel.fieldView
+        fview = self.vmodel.itemView
         fdata = self.app.model.itemData
 
         log.info(f'Save object state={fview.state}')

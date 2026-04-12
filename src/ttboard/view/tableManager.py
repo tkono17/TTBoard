@@ -6,13 +6,12 @@ from ..tools import openAssetImage
 log = logging.getLogger(__name__)
 
 class TableManager:
-    def __init__(self, columns, entries,
-                 allColumns=None, cls=None,
+    def __init__(self, columns, entries, 
+                 cls=None,
                  useIncludeButton = False,
                  useDeleteButton = False):
-        self.enabledColumns = columns
+        self.columns = columns
         self.entries = entries
-        self.allColumns = allColumns
         self.isEntrySimple = False
         
         self.useIncludeButton = useIncludeButton
@@ -21,19 +20,11 @@ class TableManager:
             'Plus': openAssetImage('Plus.png'),
             'TrashBin': openAssetImage('TrashBin.png'),
         }
-        log.info(f'  enabled: {self.enabledColumns}')
-        log.info(f'  allcolumnns: {self.allColumns}')
+        log.info(f'  enabled: {self.columns}')
         log.info(f'  N entries: {len(self.entries)}')
         for k, v in self.images.items():
             log.info(f'    image {k} : {v is not None}')
         pass
-
-    def orderedColumns(self):
-        if self.allColumns is None:
-            v = [ x for x in self.enabledColumns ]
-        else:
-            v = [ x for x in self.allColumns if x in self.enabledColumns ]
-        return v
 
     def getEntries(self):
         v = []
@@ -46,12 +37,7 @@ class TableManager:
         image = None
         if self.useDeleteButton:
             image = self.images['TrashBin']
-        for column in self.orderedColumns():
-            if column in entry.keys():
-                v.append(entry[column])
-            else:
-                v.append('')
-        return (v, image)
+        return (entry, image)
         
 class FieldsManager:
     def __init__(self, fieldsViewModel):
