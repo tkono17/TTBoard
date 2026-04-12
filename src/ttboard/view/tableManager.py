@@ -40,8 +40,8 @@ class TableManager:
         return (entry, image)
         
 class FieldsManager:
-    def __init__(self, fieldsViewModel):
-        self.model = fieldsViewModel
+    def __init__(self, itemViewModel):
+        self.model = itemViewModel
         #for field in self.model.fields:
 
     def useIncludButton(self):

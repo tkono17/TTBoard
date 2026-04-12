@@ -90,8 +90,6 @@ class ViewControl:
     def updateFieldEntries(self, table, fieldMgr):
         fview = self.vmodel.itemView
         fview.updateRows()
-        #log.info(f'  updated fields: {fview.orderedFields()}')
-        #log.info(f'  updated rows: {fieldMgr.model.rows}')
         table.updateFields(fieldMgr.rows(), self)
         pass
     
@@ -195,16 +193,6 @@ class ViewControl:
                 irow = tree.index(rows[0])
                 self.app.selectItem(irow)
                 self.itemViewMgr.update(self.app.model.itemData)
-
-                #entry = ldata.entries[irow]
-                #if ldata.isListSimple():
-                #    obj = { 'Value': str(entry) }
-                #else:
-                #    obj = entry
-                #fdata.update(ldata, irow, obj)
-                #fview.elementPath.set(fdata.elementPath)
-                #fview.key = irow
-                #fview.setState('Set')
                 self.selectObject()
                 self.updateObject()
 

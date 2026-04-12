@@ -34,8 +34,8 @@ class ListViewModel:
 
 @dataclass
 class FieldRow:
-    name: str | None = None
     isActive: bool = True
+    name: str | None = None
     value: tk.StringVar | list[Any] | dict[str,Any] | None = None
     valueType: int | str | float | list | dict | Any | None = None
 
@@ -69,9 +69,9 @@ class ItemViewModel:
         return rows1 + rows0
 
     def updateRows(self):
-        rowMap = { row.name: row for row in self.rows }
-        ofields = self.orderedFields()
-        self.rows = [ rowMap[f.name] for f in ofields ]
+        #rowMap = { row.name: row for row in self.rows }
+        #ofields = self.orderedFields()
+        #elf.rows = [ rowMap[f.name] for f in ofields ]
         return self.rows
     
 @dataclass

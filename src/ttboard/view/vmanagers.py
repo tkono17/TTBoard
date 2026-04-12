@@ -1,7 +1,10 @@
 from dataclasses import fields
 import tkinter as tk
+import logging
 from ..model import ListData, ItemData
 from .vmodel import ListViewModel, FieldState, FieldValues, ItemViewModel, FieldRow
+
+log = logging.getLogger(__name__)
 
 def isSimpleType(etype):
     if etype in (int, float, str):
@@ -29,9 +32,12 @@ class ListViewMgr:
         else:
             for item in self.lvdata.items:
                 values = []
-                for k, v in item.items():
-                    if k not in self.lvdata.header: continue
-                    values.append(v)
+                keys = item.keys()
+                for k in self.lvdata.header:
+                    if k in keys:
+                        values.append(item[k])
+                    else:
+                        values.append(None)
                 fvalues = FieldValues(values)
                 self.lvdata.rows.append(fvalues)
         pass
@@ -65,14 +71,30 @@ class ItemViewMgr:
         self.ivdata.state = 'Set'
         self.ivdata.useIncludeButton = True
         if isSimpleType(idata.elementType):
-            frow = FieldRow(name='Value', isActive=True, value=idata.item, valueType=idata.elementType)
+            var = None
+            if idata.elementType == int:
+                var = tk.IntVar(value=idata.item)
+            elif idata.elementType == float:
+                var = tk.FloatVar(value=idata.item)
+            elif idata.elementType == str:
+                var = tk.StringVar(value=idata.item)
+            frow = FieldRow(name='Value', isActive=True, value=var, valueType=idata.elementType)
             self.ivdata.rows.append(frow)
         elif idata.elementType == list:
             n = len(idata.item)
-            frow = FieldRow(name='Value', isActive=True, value=f'list[{n}]', valueType=list)
+            var = tk.StringVar(value=f'list[{n}]')
+            frow = FieldRow(name='Value', isActive=True, value=var, valueType=list)
             self.ivdata.rows.append(frow)
         else:
             for c, value in idata.item.items():
-                frow = FieldRow(name=c, isActive=True, value=value, valueType=type(value))
+                vtype = type(value)
+                if vtype == int:
+                    var = tk.IntVar(value=value)
+                elif vtype == float:
+                    var = tk.FloatVar(value=value)
+                elif vtype == str:
+                    var = tk.StringVar(value=value)
+                frow = FieldRow(name=c, isActive=True, value=var, valueType=type(value))
+                log.info(frow)
                 self.ivdata.rows.append(frow) 
 
