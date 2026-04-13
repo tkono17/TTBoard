@@ -12,6 +12,13 @@ def isSimpleType(etype):
     else:
         return False
     
+def cellContent(value):
+    x = None
+    vtype = type(value)
+    if value is None:
+        x = None
+    return x
+    
 class ListViewMgr:
     def __init__(self, vmodel: ListViewModel):
         self.lvdata = vmodel
@@ -21,6 +28,7 @@ class ListViewMgr:
         self.lvdata.rows = []
         self.lvdata.header = [ fstate.name for fstate 
                               in filter(lambda x: x.isActive, self.lvdata.fieldStates)]
+        log.info(f'item = {self.lvdata.items}, type={self.lvdata.elementType}')
         if isSimpleType(self.lvdata.elementType):
             for item in self.lvdata.items:
                 fvalues = FieldValues([item])
@@ -46,7 +54,7 @@ class ListViewMgr:
         self.lvdata.collection = tk.StringVar(value=ldata.collection)
         self.lvdata.jsonPath = tk.StringVar(value=ldata.jsonPath)
         self.lvdata.items = ldata.entries
-        self.lvdata.Type = ldata.elementType
+        self.lvdata.elementType = ldata.elementType
         self.lvdata.fieldStates = []
         self.lvdata.displayStyle = 'table'
         if ldata.isListSimple():
@@ -66,10 +74,12 @@ class ItemViewMgr:
 
     def update(self, idata: ItemData):
         self.ivdata.elementPath = tk.StringVar(value=idata.elementPath)
+        self.ivdata.item = idata.item
         self.ivdata.key = idata.elementKey
         self.ivdata.rows = []
         self.ivdata.state = 'Set'
         self.ivdata.useIncludeButton = True
+        log.info(f'ItemViewMgr update: {idata}')
         if isSimpleType(idata.elementType):
             var = None
             if idata.elementType == int:

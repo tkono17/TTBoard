@@ -8,7 +8,7 @@ import re
 from ..tools import mainType
 from .tableManager import TableManager, FieldsManager
 from .vmodel import ViewModel, FieldState, FieldRow
-from .vmanagers import ListViewMgr, ItemViewMgr
+from .vmanagers import ListViewMgr, ItemViewMgr, isSimpleType
 
 log = logging.getLogger(__name__)
 
@@ -108,18 +108,17 @@ class ViewControl:
             pass
 
     def selectObject(self):
-        ldata = self.app.model.listData
-        fdata = self.app.model.itemData
-        fview = self.vmodel.itemView
+        lvdata = self.vmodel.listView
+        ivdata = self.vmodel.itemView
 
-        fview.elementPath.set(fdata.elementPath)
-        log.info(f'Select object at {fview.elementPath.get()}')
-        obj = fdata.item
+        ivdata.elementPath.set(fdata.elementPath)
+        log.info(f'Select object at {ivdata.elementPath.get()}')
         keys = obj.keys()
         rows = []
         fieldNames = []
-        if ldata.isListSimple():
-            valueField = tk.StringVar(value=obj['Value'])
+        if isSimpleType(lvdata.elementType):
+            valueField = tk.StringVar(ivdata.item)
+            self.itemViewMgr.update()
             row = FieldRow(True, 'Value', valueField, str)
             rows.append(row)
         else:
@@ -136,12 +135,13 @@ class ViewControl:
                         valueField = tk.StringVar(value=value)
                 row = FieldRow(included, field.name, valueField, vtype)
                 rows.append(row)
-        fview.rows = rows
-        log.info(f'  fview = {fview}, rows={fview.rows}')
+        ivdata.rows = rows
+        log.info(f'  ivdata = {ivdata}, rows={ivdata.rows}')
         
     def updateObject(self):
-        fview = self.vmodel.itemView
-        self.fieldMgr = FieldsManager(fview)
+        ivdata = self.vmodel.itemView
+        log.info(f'Update object {ivdata}')
+        self.fieldMgr = FieldsManager(ivdata)
         tree = self.findWidget('objectTable')
         self.updateFieldEntries(tree, self.fieldMgr)
         
@@ -193,7 +193,6 @@ class ViewControl:
                 irow = tree.index(rows[0])
                 self.app.selectItem(irow)
                 self.itemViewMgr.update(self.app.model.itemData)
-                self.selectObject()
                 self.updateObject()
 
     def onDeleteEntry(self):
@@ -201,8 +200,8 @@ class ViewControl:
     
     def onFieldClicked(self, irow, event):
         log.info(f'Field clicked {event.widget} irow={irow}')
-        fview = self.vmodel.itemView
-        fview.rows[irow].isActive = not fview.rows[irow].isActive
+        ivdata = self.vmodel.itemView
+        ivdata.rows[irow].isActive = not ivdata.rows[irow].isActive
         self.updateObject()
 
     def onNewEntry(self):

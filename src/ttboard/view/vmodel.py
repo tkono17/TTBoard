@@ -52,6 +52,7 @@ class FieldRow:
 @dataclass
 class ItemViewModel:
     elementPath: tk.StringVar = field(default_factory=tk.StringVar)
+    item: Any = None
     key: str | int | None = None
     rows: list[FieldRow] | None = field(default_factory=list)
     state: str | None = None

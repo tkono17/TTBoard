@@ -145,10 +145,10 @@ class ItemMgr:
         self.data.containerMatch = ematch.parent
         self.data.elementPath = listMgr.elementPath(ldata.key)
         self.data.containerPath = listMgr.containerPath()
-        self.data.elementType = listMgr.elementType
+        self.data.elementType = listMgr.data.elementType
 
         log.info(f'  ematch: {ematch}')
-        log.info(f'  epath = {self.data.elementPath}')
+        log.info(f'  epath = {self.data.elementPath} T={self.data.elementType}')
         if self.data.elementPath is not None:
             mg = re.match(r'.*\[(.*?)\]$', self.data.elementPath)
             if mg is not None:
@@ -191,7 +191,7 @@ class ItemMgr:
         pmatches = list(jsonpath.query(self.data.containerPath, self.document))
         self.data.containerMatch = pmatches[0] if len(pmatches)>0 else None
         self.data.item = listMgr.newElement()
-        self.data.elementType = listMgr.elementType
+        self.data.elementType = listMgr.data.elementType
     
     def save(self):
         if self.data.elementMatch is not None:
