@@ -17,7 +17,7 @@ class PropsTable(tk.Frame):
         self.headings = None
         self.rows = []
 
-    def valueWidget(self, var, vc):
+    def valueWidget(self, key, var, vc):
         w = None
         bgcolor = 'white smoke'
         tvalue = type(var)
@@ -28,8 +28,10 @@ class PropsTable(tk.Frame):
             var.trace_add('write', vc.onFieldChanged)
         elif tvalue == list:
             w = ttk.Button(self, text='Show list', style='objOn.TButton')
+            w.bind('<Button-1>', partial(vc.onShowChildList, key))
         elif tvalue == dict:
             w = ttk.Button(self, text='Show object', style='objOn.TButton')
+            w.bind('<Button-1>', partial(vc.onShowChildObject, key))
         else:
             log.warning(f'  Unexpected variable type in the row entry {tvalue}')
             w = tk.Entry(self)
@@ -48,7 +50,7 @@ class PropsTable(tk.Frame):
 
         image0 = tk.Label(self, image=image, bg=bgcolor)
         label1 = tk.Label(self, text=key, bg=bgcolor)
-        w2 = self.valueWidget(value, vc)
+        w2 = self.valueWidget(key, value, vc)
         
         col0 = 0
         if self.useInclude:

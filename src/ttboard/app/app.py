@@ -108,16 +108,19 @@ class App:
 
     def save(self):
         log.info(f'Save {self.model.document}')
-        fn1 = self.model.documentPath.replace('.json', '-tmp.json')
-        fn2 = self.model.documentPath.replace('.json', '-backup.json')
-        if os.path.exists(fn1):
-            os.remove(fn1)
-        self.saveJsonFile(fn1)
-        if os.path.exists(fn2):
-            os.remove(fn2)
-        if os.path.exists(self.model.documentPath):
-            os.rename(self.model.documentPath, fn2)
-        os.rename(fn1, self.model.documentPath)
+        if self.model.documentPath is None:
+            log.warning(f'  Document is not open, use saveAs(...)')
+        else:
+            fn1 = self.model.documentPath.replace('.json', '-tmp.json')
+            fn2 = self.model.documentPath.replace('.json', '-backup.json')
+            if os.path.exists(fn1):
+                os.remove(fn1)
+            self.saveJsonFile(fn1)
+            if os.path.exists(fn2):
+                os.remove(fn2)
+            if os.path.exists(self.model.documentPath):
+                os.rename(self.model.documentPath, fn2)
+            os.rename(fn1, self.model.documentPath)
 
     def selectCollection(self, colName):
         self.model.listData.collection = colName
@@ -133,8 +136,34 @@ class App:
         selector = self.findSelector(selectorName)
         selector.composePath(*args)
         v = self.listMgr.findall(selector)
-        log.info(f' v = {v}, entries = {self.listMgr.entries}')
+        log.info(f'  entries = {self.model.listData}')
         return v
+
+    def getListFromPath(self, jpath, etype):
+        self.model.listData.collection = None
+        v = self.listMgr.findallFromPath(jpath, etype)
+        log.info(f'  entries = {self.model.listData}')
+        return v
+
+    def getObjectFromPath(self, jpath, etype):
+        idata = self.model.itemData
+        idata.containerPath = idata.elementPath
+        idata.elementPath = jpath
+
+        v = jsonpath.query(jpath, self.document)
+        if v is not None and len(v)==1:
+            ematch = v[0]
+            idata.elementMatch = ematch
+            idata.elementPath = ematch.path
+            pointer = ematch.pointer()
+            idata.item = pointer.resolve(self.document)
+            parent = pointer.resolve_parrent(self.document)
+            idata.containerMatch = parent
+            mg = re.match(r'.*(\[.*?\])$')
+            if mg is not None:
+                idata.elementKey = mg.group(1)
+            idata.elementType = type(idata.item)
+        return idata.item
 
     def findall(self, jpath):
         entries = jsonpath.findall(jpath, self.model.document)
@@ -178,6 +207,7 @@ class App:
             self.itemMgr.save()
         else:
             log.warning(f'  Failed to save item since item is not selected')
+        self.save()
 
     def updateItem(self, *args):
         log.info(f'updateItem {args}')

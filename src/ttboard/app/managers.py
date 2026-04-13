@@ -45,7 +45,18 @@ class ListMgr:
             self.data.entries = self.selector.findall(self.document)
             self.data.elementType = self.selector.elementType
         log.info(f'{len(self.data.entries)} entries')
-        log.info(f'  doc = {self.document}')
+        return self.data.entries
+
+    def findallFromPath(self, jpath, etype):
+        self.clear()
+
+        self.data.jsonPath = jpath
+        v = jsonpath.query(jpath, self.document)
+        if v is not None:
+            self.data.jsonMatches = [ x for x in v ]
+            self.data.entries = jsonpath.findall(jpath, self.document)
+            self.data.elementType = None
+        log.info(f'{len(self.data.entries)} entries')
         return self.data.entries
 
     def show(self):
@@ -120,11 +131,11 @@ class ListMgr:
         return e
 
     def clear(self):
-        self.jsonPath = None
-        self.jsonMatches = None
-        self.entries = None
-        self.elementType = None
-        self.key = None
+        self.data.jsonPath = None
+        self.data.jsonMatches = None
+        self.data.entries = None
+        self.data.elementType = None
+        self.data.key = None
 
 class ItemMgr:
     def __init__(self, itemData, document):

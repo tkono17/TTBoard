@@ -88,8 +88,8 @@ class ViewControl:
         pass
     
     def updateFieldEntries(self, table, fieldMgr):
-        fview = self.vmodel.itemView
-        fview.updateRows()
+        ivdata = self.vmodel.itemView
+        ivdata.updateRows()
         table.updateFields(fieldMgr.rows(), self)
         pass
     
@@ -106,37 +106,6 @@ class ViewControl:
             #self.updateBoardEntries(tree, entries, columnsEn)
             log.warning('Board view not supported yet')
             pass
-
-    def selectObject(self):
-        lvdata = self.vmodel.listView
-        ivdata = self.vmodel.itemView
-
-        ivdata.elementPath.set(fdata.elementPath)
-        log.info(f'Select object at {ivdata.elementPath.get()}')
-        keys = obj.keys()
-        rows = []
-        fieldNames = []
-        if isSimpleType(lvdata.elementType):
-            valueField = tk.StringVar(ivdata.item)
-            self.itemViewMgr.update()
-            row = FieldRow(True, 'Value', valueField, str)
-            rows.append(row)
-        else:
-            for field in fields(ldata.elementType):
-                included, value = False, ''
-                vtype = mainType(field)
-                valueField = None
-                if field.name in keys:
-                    included = True
-                    value = obj[field.name]
-                    if type(value) in (list, dict):
-                        valueField = value
-                    else:
-                        valueField = tk.StringVar(value=value)
-                row = FieldRow(included, field.name, valueField, vtype)
-                rows.append(row)
-        ivdata.rows = rows
-        log.info(f'  ivdata = {ivdata}, rows={ivdata.rows}')
         
     def updateObject(self):
         ivdata = self.vmodel.itemView
@@ -205,38 +174,8 @@ class ViewControl:
         self.updateObject()
 
     def onNewEntry(self):
-        ldata = self.app.model.listData
-        fdata = self.app.model.itemData
-        lview = self.vmodel.listView
-        fview = self.vmodel.itemView
-        
-        jpath = lview.jsonPath.get()
-        log.info(f'Find parent path of {jpath}')
-        cpath = None
-        obj = None
-        if hasattr(ldata.elementType, '__dataclass_fields__'):
-            obj = {
-                f.name: '' for f in fields(ldata.elementType) \
-                if (f.default is MISSING and f.default_factory is MISSING)
-            }
-            cpath = ldata.containerPath()
-        elif ldata.elementType == list:
-            obj = { '[]': '[]' }
-            cpath = ldata.containerPath()
-        else:
-            obj = { 'Value': ''}
-            cpath = ldata.containerPath()
-        fdata.containerPath = cpath
-        fdata.jsonMatch = None
-        fdata.parentMatch = None
-        fdata.item = obj
-        fdata.elementType = ldata.elementType
-
-        fview.elementPath.set(cpath)
-        fview.key = None
-        ldata.entry = obj
-        fview.setState('New')
-        self.selectObject()
+        self.app.selectItem()
+        self.itemViewMgr.update(self.app.model.itemData)
         self.updateObject()
         
     def onListSave(self):
@@ -244,72 +183,46 @@ class ViewControl:
 
     def onFieldChanged(self, *args):
         log.info(f'Field changed')
-        fview = self.vmodel.itemView
-        fview.setState('Modified')
+        self.vmodel.itemView.setState('Modified')
+        
+    def onShowChildList(self, key, event):
+        log.info(f'Show child list e={event}')
+        lvdata = self.vmodel.listView
+        ivdata = self.vmodel.itemView
+        var = ivdata.item[key]
+        log.info(f'epath = {ivdata.elementPath}, {ivdata.elementPath.get()}')
+        jpath = f'{ivdata.elementPath.get()}.{key}[*]'
+        log.info(f'path={jpath}')
+        self.app.getListFromPath(jpath, type(var))
+        self.listViewMgr.update(self.app.model.listData)
+        self.updateListTable()
+
+    def onShowChildObject(self, key, event):
+        ivdata = self.vmodel.itemView
+        var = ivdata.item[key]
+        log.info(f'epath = {ivdata.elementPath}, {ivdata.elementPath.get()}')
+        jpath = f'{ivdata.elementPath.get()}.{key}'
+        self.app.getObjectFromPath(jpath, type(var))
+        self.itemViewMgr.update(self.app.model.itemData)
+        self.updateObject()
         
     def onSaveFields(self, event):
-        fview = self.vmodel.itemView
-        fdata = self.app.model.itemData
-
-        log.info(f'Save object state={fview.state}')
-        cpath = fview.elementPath.get()
+        ivdata = self.vmodel.itemView
+        idata = self.app.model.itemData
         modified = False
-        cont = None
 
-        if fdata.isEntrySimple():
-            cpath = fdata.containerPath
-            cmatch = fdata.containerMatch
-            if cmatch is None:
-                cmatches = jsonpath.query(cpath, self.app.model.document)
-                if cmatches is not None and len(cmatches)>0:
-                    cmatch = cmatches[0]
-                    jpointer = cmatch.pointer()
-                    cont = jpointer.resolve(self.app.model.document)
-                else:
-                    log.warning(f'Cannot identify container of {cpath}')
-                    return
+        log.info(f'Save object state={ivdata.state}')
+
+        if ivdata.state in ('New', 'Modified'):
+            if idata.isItemScalar():        
+                value = ivdata.rows[0].getValue()
+                self.app.setValue(value)
             else:
-                jpointer = cmatch.pointer()
-                cont = jpointer.resolve(self.app.model.document)
-            if fview.state == 'New':
-                value = fview.rows[0].getValue()
-                cont.append(value)
-            else:
-                log.info(f'Write {cpath} key={fview.key}, cont={cont}')
-                cont[fview.key] = fview.rows[0].getValue()
-            pass
-        else:
-            cpath = fdata.elementPath
-            cmatch = fdata.elementMatch
-            if cmatch is None:
-                cpath = fdata.containerPath
-                cmatches = jsonpath.query(cpath, self.app.model.document)
-                for cmatch in cmatches:
-                    jpointer = cmatch.pointer()
-                    cont2 = jpointer.resolve(self.app.model.document)
-                    cont = {}
-                    cont2.append(cont)
-                    break
-                if cont is None:
-                    log.warning(f'Cannot identify container of {cpath}')
-                    return
-            else:
-                jpointer = cmatch.pointer()
-                cont = jpointer.resolve(self.app.model.document)
-            log.info(f'Got container: {cont}')
-            if fview.state == 'New':
-                for row in fview.rows:
-                    if row.isActive:
-                        cont[row.name] = row.getValue()
-            else:
-                for row in fview.rows:
-                    if row.isActive:
-                        value = row.getValue()
-                        log.info(f'  value of {row.name} is {value}, T={row.valueType}')
-                        cont[row.name] = value
-                    elif row.name in cont.keys():
-                        cont.pop(row.name)
+                for row in ivdata.rows:
+                    self.app.setField(row.name, row.getValue())
+            self.app.saveItem()
+            ivdata.setState('Set')
             modified = True
-        modified = True
+
         if modified:
             self.app.save()
