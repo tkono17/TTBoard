@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 import logging
+from functools import partial
 from .tables import PropsTable
 from .scroll import addScrollBar
 
@@ -10,7 +11,7 @@ class CollectionRow(tk.Frame):
     def __init__(self, master, **kwargs):
         super().__init__(master, **kwargs)
         
-    def build(self, vc):
+    def build(self, vc, suffix=''):
         lview = vc.vmodel.listView
         
         label = tk.Label(self, text='Collections: ')
@@ -22,8 +23,8 @@ class CollectionRow(tk.Frame):
         jpathText = tk.Entry(self, textvariable=lview.jsonPath)
         lview.jsonPath.set('$.*')
 
-        vc.addWidget('collectionCBox', combobox)
-        vc.addWidget('listJpathText', jpathText)
+        vc.addWidget(f'collectionCBox{suffix}', combobox)
+        vc.addWidget(f'listJpathText{suffix}', jpathText)
         
         label.pack(side=tk.LEFT)
         combobox.pack(side=tk.LEFT, fill=tk.X)
@@ -34,13 +35,13 @@ class PathRow(tk.Frame):
     def __init__(self, master, **kwargs):
         super().__init__(master, **kwargs)
         
-    def build(self, vc):
+    def build(self, vc, suffix=''):
         fview = vc.vmodel.itemView
         
         jpathLabel = tk.Label(self, text='JSONPath: ')
         jpathText = tk.Entry(self, textvariable=fview.elementPath)
 
-        vc.addWidget('objJpathText', jpathText)
+        vc.addWidget(f'objJpathText{suffix}', jpathText)
 
         jpathLabel.pack(side=tk.LEFT)
         jpathText.pack(side=tk.LEFT, fill=tk.X, expand=True)
@@ -98,8 +99,8 @@ class ListPanel(tk.Frame):
     def __init__(self, master, **kwargs):
         super().__init__(master, **kwargs)
         
-    def build(self, vc):
-        label = tk.Label(self, text='List view')
+    def build(self, vc, title, suffix=''):
+        label = tk.Label(self, text=title)
         label.pack(anchor=tk.NW)
         collection = CollectionRow(self)
         buttons = ListButtons(self)
@@ -107,10 +108,13 @@ class ListPanel(tk.Frame):
         table = ttk.Treeview(tableFrame, columns=(1, 2, 3), show='headings')
         addScrollBar(table, scrollX=True, scrollY=True)
 
-        table.bind('<Double-1>', vc.onEntrySelected)
-        vc.addWidget('listTable', table)
+        listNumber = 1
+        if suffix == '2':
+            listNumber = 2
+        table.bind('<Double-1>', partial(vc.onEntrySelected, listNumber))
+        vc.addWidget(f'listTable{suffix}', table)
         
-        collection.build(vc)
+        collection.build(vc, suffix)
         buttons.build(vc)
         #table.build(vc)
         
@@ -150,13 +154,20 @@ class MainPanel(tk.Frame):
         super().__init__(master, **kwargs)
 
     def build(self, vc):
-        splitPanel = tk.PanedWindow(self, orient=tk.HORIZONTAL, bd=2, sashrelief=tk.GROOVE)
-        self.listPanel = ListPanel(splitPanel, bg='blue')
+        splitPanel = tk.PanedWindow(self, orient=tk.HORIZONTAL, bd=2, sashrelief=tk.GROOVE, height=400)
+
+        twoListPanel = tk.PanedWindow(self, orient=tk.VERTICAL, bd=2, sashrelief=tk.GROOVE, height=200)
+        self.listPanel = ListPanel(twoListPanel, bg='blue')
+        self.listPanel2 = ListPanel(twoListPanel, bg='blue')
+        twoListPanel.add(self.listPanel)
+        twoListPanel.add(self.listPanel2)
+
         self.objectPanel = ObjectPanel(splitPanel, bg='green')
-        self.listPanel.build(vc)
+        self.listPanel.build(vc, title='List view')
+        self.listPanel2.build(vc, title='2nd list view', suffix='2')
         self.objectPanel.build(vc)
         
-        splitPanel.add(self.listPanel, width=800)
+        splitPanel.add(twoListPanel, width=800)
         splitPanel.add(self.objectPanel, width=300)
 
         splitPanel.pack(expand=True, fill=tk.BOTH)

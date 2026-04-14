@@ -50,12 +50,16 @@ class ListMgr:
     def findallFromPath(self, jpath, etype):
         self.clear()
 
+        self.data.collection = None
         self.data.jsonPath = jpath
+        log.info(f'findall2 {jpath}')
+        log.info(f'  doc = {self.document}')
         v = jsonpath.query(jpath, self.document)
         if v is not None:
             self.data.jsonMatches = [ x for x in v ]
+            log.info(f'  matches = {self.data.jsonMatches}')
             self.data.entries = jsonpath.findall(jpath, self.document)
-            self.data.elementType = None
+            self.data.elementType = etype
         log.info(f'{len(self.data.entries)} entries')
         return self.data.entries
 
@@ -157,6 +161,7 @@ class ItemMgr:
         self.data.elementPath = listMgr.elementPath(ldata.key)
         self.data.containerPath = listMgr.containerPath()
         self.data.elementType = listMgr.data.elementType
+        self.data.elementKey = ldata.key
 
         log.info(f'  ematch: {ematch}')
         log.info(f'  epath = {self.data.elementPath} T={self.data.elementType}')

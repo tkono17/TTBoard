@@ -57,6 +57,7 @@ class ItemViewModel:
     rows: list[FieldRow] | None = field(default_factory=list)
     state: str | None = None
     useIncludeButton: bool = True
+    elementType: Any = None
 
     def setState(self, newState):
         if newState == 'Modified' and self.state == 'New':
@@ -78,5 +79,6 @@ class ItemViewModel:
 @dataclass
 class ViewModel:
     listView: ListViewModel = field(default_factory=ListViewModel)
+    list2View: ListViewModel = field(default_factory=ListViewModel)
     itemView: ItemViewModel = field(default_factory=ItemViewModel)
 

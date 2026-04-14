@@ -5,9 +5,9 @@ from tkinter import filedialog
 import jsonpath
 import logging
 import re
-from ..tools import mainType
+from ..tools import mainType, typesOfField, elementTypesOfListField
 from .tableManager import TableManager, FieldsManager
-from .vmodel import ViewModel, FieldState, FieldRow
+from .vmodel import ViewModel, ListViewModel, ItemViewModel
 from .vmanagers import ListViewMgr, ItemViewMgr, isSimpleType
 
 log = logging.getLogger(__name__)
@@ -25,9 +25,10 @@ class ViewControl:
         self.fileDirName = os.getcwd()
 
         # Data related to panels
-        self.vmodel = ViewModel()
+        self.vmodel = ViewModel(ListViewModel(), ListViewModel(), ItemViewModel())
 
         self.listViewMgr = ListViewMgr(self.vmodel.listView)
+        self.list2ViewMgr = ListViewMgr(self.vmodel.list2View)
         self.itemViewMgr = ItemViewMgr(self.vmodel.itemView)
 
     def updateListViewModel(self, listData):
@@ -48,10 +49,10 @@ class ViewControl:
 
     def findWidget(self, wname):
         w = None
-        log.info(f'  widget names: {self.widgets.keys()}')
+        #log.info(f'  widget names: {self.widgets.keys()}')
         if wname in self.widgets.keys():
             w = self.widgets[wname]
-            log.info(f'  widget is {w}')
+            #log.info(f'  widget is {w}')
         else:
             log.warning(f'  widget not found {self.widgets.items()}')
         return w
@@ -68,7 +69,7 @@ class ViewControl:
         if table:
             table.delete(*table.get_children())
             ocolumns = tableMgr.columns
-            log.info(f'  ordered columns: {ocolumns}')
+            #log.info(f'  ordered columns: {ocolumns}')
 
             table.config(show='tree headings', columns=ocolumns)
             for heading in ocolumns:
@@ -80,7 +81,7 @@ class ViewControl:
             entries = tableMgr.getEntries()
             for fvalues, image in entries:
                 values = fvalues.values
-                log.info(f'values= {values}')
+                #log.info(f'values= {values}')
                 if image is not None:
                     table.insert('', 'end', image=image, values=values)
                 else:
@@ -93,15 +94,22 @@ class ViewControl:
         table.updateFields(fieldMgr.rows(), self)
         pass
     
-    def updateListTable(self):
-        lvdata = self.vmodel.listView
-        tree = self.findWidget('listTable')
+
+    def updateListTable(self, tableNumber=1):
+        lvdata = None
+        tree = None
+        if tableNumber==2:
+            lvdata = self.vmodel.list2View
+            tree = self.findWidget('listTable2')
+        else:
+            lvdata = self.vmodel.listView
+            tree = self.findWidget('listTable')
         columnsEn = lvdata.header
         if lvdata.displayStyle == 'table':
-            self.listTableMgr = TableManager(lvdata.header,
-                                             lvdata.rows,
-                                             useDeleteButton=True)
-            self.updateTableEntries(tree, self.listTableMgr)
+            listTableMgr = TableManager(lvdata.header,
+                                        lvdata.rows,
+                                        useDeleteButton=True)
+            self.updateTableEntries(tree, listTableMgr)
         elif lvdata.displayStyle == 'board':
             #self.updateBoardEntries(tree, entries, columnsEn)
             log.warning('Board view not supported yet')
@@ -153,14 +161,13 @@ class ViewControl:
         self.listViewMgr.update(self.app.model.listData)
         self.updateListTable()
 
-    def onEntrySelected(self, event):
-        log.info(f'Entry selected in {event.widget}')
+    def onEntrySelected(self, listNumber=1, event=None):
         tree = event.widget
         if tree.identify_region(event.x, event.y) == 'cell':
             rows = tree.selection()
             if len(rows) == 1:
                 irow = tree.index(rows[0])
-                self.app.selectItem(irow)
+                self.app.selectItem(irow, listNumber)
                 self.itemViewMgr.update(self.app.model.itemData)
                 self.updateObject()
 
@@ -187,15 +194,26 @@ class ViewControl:
         
     def onShowChildList(self, key, event):
         log.info(f'Show child list e={event}')
-        lvdata = self.vmodel.listView
         ivdata = self.vmodel.itemView
         var = ivdata.item[key]
+        ctype, etype = ivdata.elementType, None
+        log.info(f'  ctype = {ctype}')
+        if hasattr(ctype, '__dataclass_fields__'):
+            ff = list(filter(lambda x: x.name == key, fields(ctype)))
+            if len(ff)==1:
+                tname = ff[0].type
+                vt = typesOfField(tname)
+                etype = elementTypesOfListField(vt[0])[0]
+        else:
+            log.warning(f'  Not a dataclass {var}')
         log.info(f'epath = {ivdata.elementPath}, {ivdata.elementPath.get()}')
         jpath = f'{ivdata.elementPath.get()}.{key}[*]'
         log.info(f'path={jpath}')
-        self.app.getListFromPath(jpath, type(var))
-        self.listViewMgr.update(self.app.model.listData)
-        self.updateListTable()
+        self.app.getList2FromPath(jpath, etype)
+        log.info(f'  list2Data: {self.app.model.list2Data}')
+        self.list2ViewMgr.update(self.app.model.list2Data)
+        log.info(f'  vmodel.list2View: {self.vmodel.list2View}')
+        self.updateListTable(2)
 
     def onShowChildObject(self, key, event):
         ivdata = self.vmodel.itemView

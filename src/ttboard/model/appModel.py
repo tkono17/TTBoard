@@ -92,6 +92,7 @@ class AppModel:
     selectors: list[JsonSelector] | None = None
     #
     listData: ListData = field(default_factory=ListData)
+    list2Data: ListData = field(default_factory=ListData)
     itemData: ItemData = field(default_factory=ItemData)
     
     

@@ -25,6 +25,11 @@ class App:
         self.model.listData.entires = None
         self.model.listData.elementType = None
         
+        self.model.list2Data.jsonPath = None
+        self.model.list2Data.jsonMatches = None
+        self.model.list2Data.entires = None
+        self.model.list2Data.elementType = None
+
         self.model.itemData.elementPath = None
         self.model.itemData.containerPath = None
         self.model.itemData.elementMatch = None
@@ -34,6 +39,7 @@ class App:
         self.model.itemData.elementType = None
 
         self.listMgr = ListMgr(self.model.listData, self.model.document)
+        self.list2Mgr = ListMgr(self.model.list2Data, self.model.document)
         self.itemMgr = None
 
     def initialize(self):
@@ -73,6 +79,7 @@ class App:
                 self.model.documentPath = fpath
                 self.model.document = json.load(fin)
                 self.listMgr.document = self.model.document
+                self.list2Mgr.document = self.model.document
             self.loadModule()
         else:
             log.warning(f'JSON file at {fpath} does not exist')
@@ -99,6 +106,7 @@ class App:
         self.model.document = e
         self.model.document['metadata']['dataModule'] = module_name
         self.listMgr.document = e
+        self.list2Mgr.document = e
         log.info(f'New document {self.model.document}')
         pass
 
@@ -136,13 +144,13 @@ class App:
         selector = self.findSelector(selectorName)
         selector.composePath(*args)
         v = self.listMgr.findall(selector)
-        log.info(f'  entries = {self.model.listData}')
+        log.info(f'  Got {len(self.model.listData.entries)} entries')
         return v
 
-    def getListFromPath(self, jpath, etype):
-        self.model.listData.collection = None
-        v = self.listMgr.findallFromPath(jpath, etype)
-        log.info(f'  entries = {self.model.listData}')
+    def getList2FromPath(self, jpath, etype):
+        self.model.list2Data.collection = None
+        v = self.list2Mgr.findallFromPath(jpath, etype)
+        log.info(f'  Got {len(self.model.list2Data.entries)} entries')
         return v
 
     def getObjectFromPath(self, jpath, etype):
@@ -169,23 +177,29 @@ class App:
         entries = jsonpath.findall(jpath, self.model.document)
         return entries
     
-    def newItem(self):
-        e = self.listMgr.newElement()
+    def newItem(self, listNumber=1):
+        listMgr = self.listMgr
+        if listNumber == 2:
+            listMgr = self.list2Mgr
+        e = listMgr.newElement()
         log.info(f'newItem {e}')
         self.model.itemData.item = e
         self.itemMgr = createItemMgr(self.model.itemData, self.model.document)
-        self.itemMgr.newItem(self.listMgr)
+        self.itemMgr.newItem(listMgr)
 
-    def selectItem(self, ientry=None):
-        log.info(f'selectItem {self.listMgr.data.entries}')
+    def selectItem(self, ientry=None, listNumber=1):
+        #log.info(f'selectItem {self.listMgr.data.entries}')
+        listMgr = self.listMgr
+        if listNumber == 2:
+            listMgr = self.list2Mgr
         if ientry is None:
             return self.newItem()
-        elif self.listMgr.data.entries is not None and \
-            ientry >= 0 and ientry < len(self.listMgr.data.entries):
-            self.model.listData.key = ientry
-            self.model.itemData.item = self.model.listData.entries[ientry]
+        elif listMgr.data.entries is not None and \
+            ientry >= 0 and ientry < len(listMgr.data.entries):
+            listMgr.data.key = ientry
+            self.model.itemData.item = listMgr.data.entries[ientry]
             self.itemMgr = createItemMgr(self.model.itemData, self.model.document)
-            self.itemMgr.update(self.listMgr)
+            self.itemMgr.update(listMgr)
 
     def setField(self, key, value):
         tim = type(self.itemMgr)

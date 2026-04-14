@@ -1,5 +1,6 @@
 import re
 import logging
+import typing
 
 log = logging.getLogger(__name__)
 
@@ -19,6 +20,12 @@ def mainType(dataField):
         log.warning(f'Cannot find the main type of {dataField}, use str')
         dtype = str
     return dtype
+
+def typesOfField(dataField):
+    return typing.get_args(dataField)
+
+def elementTypesOfListField(listField):
+    return typing.get_args(listField)
 
 def readScalar(word: int | float | str):
     value = None

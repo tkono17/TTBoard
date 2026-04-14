@@ -33,7 +33,7 @@ class ListViewMgr:
         self.lvdata.rows = []
         self.lvdata.header = [ fstate.name for fstate 
                               in filter(lambda x: x.isActive, self.lvdata.fieldStates)]
-        log.info(f'item = {self.lvdata.items}, type={self.lvdata.elementType}')
+        #log.info(f'item = {self.lvdata.items}, type={self.lvdata.elementType}')
         if self.lvdata.elementType is not None:
             if isSimpleType(self.lvdata.elementType):
                 for item in self.lvdata.items:
@@ -49,7 +49,7 @@ class ListViewMgr:
                 for item in self.lvdata.items:
                     values = []
                     keys = item.keys()
-                    log.info(f'  set field item {item}')
+                    #log.info(f'  set field item {item}')
                     for k in self.lvdata.header:
                         if k in keys:
                             values.append(tableCellContent(item[k]))
@@ -81,7 +81,7 @@ class ListViewMgr:
                             values.append(None)
                     fvalues = FieldValues(values)
                     self.lvdata.rows.append(fvalues)
-        log.info(f'  List data: {self.lvdata}')
+        #log.info(f'  List data: {self.lvdata}')
         pass
 
     def update(self, ldata: ListData):
@@ -125,6 +125,9 @@ class ItemViewMgr:
         self.ivdata.rows = []
         self.ivdata.state = 'Set' if idata.elementKey is not None else 'New'
         self.ivdata.useIncludeButton = True
+        self.ivdata.elementType = idata.elementType
+        log.info(f'  ItemViewMgr etype = {self.ivdata.elementType}')
+
         log.info(f'ItemViewMgr update: {idata}')
         if isSimpleType(idata.elementType):
             var = None
